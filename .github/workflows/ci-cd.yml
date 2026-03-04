@@ -48,6 +48,10 @@ jobs:
           ./gradlew test jacocoTestReport
         env:
           SPRING_PROFILES_ACTIVE: test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Frontend Lint & Tests
         run: |

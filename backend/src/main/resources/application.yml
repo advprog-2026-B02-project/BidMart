@@ -12,10 +12,6 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
 
   jackson:
     serialization:
@@ -37,7 +33,7 @@ spring:
       on-profile: test
 
   datasource:
-    url: jdbc:h2:mem:bidmart_test
+    url: jdbc:h2:mem:bidmart_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     driver-class-name: org.h2.Driver
     username: sa
     password:
