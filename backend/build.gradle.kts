@@ -43,6 +43,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("spring.profiles.active", "test")
     finalizedBy(tasks.jacocoTestReport)
 }
 
