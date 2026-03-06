@@ -1,6 +1,8 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.entity;
 
 import jakarta.persistence.*;
+import lombok.Setter;
+
 import java.time.Instant;
 
 @Entity
@@ -14,16 +16,20 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Setter
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Setter
     @Column(nullable = false, unique = true, length = 200)
     private String token;
 
+    @Setter
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Setter
     @Column(nullable = false)
     private boolean revoked = false;
 
@@ -33,16 +39,12 @@ public class RefreshToken {
     public Long getId() { return id; }
 
     public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
 
     public String getToken() { return token; }
-    public void setToken(String token) { this.token = token; }
 
     public Instant getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
 
     public boolean isRevoked() { return revoked; }
-    public void setRevoked(boolean revoked) { this.revoked = revoked; }
 
     public Instant getCreatedAt() { return createdAt; }
 }

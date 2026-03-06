@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {useRouter} from "next/navigation";
 import AuthShell from "@/components/AuthShell";
-import { buttonCls, inputCls } from "@/components/ui";
-import { login as apiLogin } from "@/lib/api";
+import {buttonCls, inputCls} from "@/components/ui";
+import {login as apiLogin} from "@/lib/api";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -23,7 +23,7 @@ export default function LoginPage() {
             await apiLogin(email, pass);
             router.push("/me");
         } catch (err: any) {
-            setMsg(err.message || "Gagal masuk.");
+            setMsg(err.message);
         } finally {
             setLoading(false);
         }

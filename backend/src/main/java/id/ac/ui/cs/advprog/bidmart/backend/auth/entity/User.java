@@ -1,6 +1,8 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.entity;
 
 import jakarta.persistence.*;
+import lombok.Setter;
+
 import java.time.Instant;
 
 @Entity
@@ -16,9 +18,11 @@ public class User {
     @Column(nullable = false, unique = true, length = 320)
     private String email;
 
+    @Setter
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
+    @Setter
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified = false;
 
@@ -39,10 +43,8 @@ public class User {
     public void setEmail(String email) { this.email = email.toLowerCase().trim(); }
 
     public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
     public boolean isEmailVerified() { return emailVerified; }
-    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

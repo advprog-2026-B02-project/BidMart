@@ -30,6 +30,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("com.h2database:h2")

@@ -3,15 +3,10 @@ const BASE_URL = "http://localhost:8080";
 async function parseError(res: Response) {
     try {
         const data = await res.json();
-        if (typeof data === "string") return data;
-        if (data?.message) return data.message;
-        return JSON.stringify(data);
+        return data.message || data.error || JSON.stringify(data);
     } catch {
-        try {
-            return await res.text();
-        } catch {
-            return `Request failed (${res.status})`;
-        }
+        const text = await res.text();
+        return text || `Error (${res.status})`;
     }
 }
 
@@ -45,7 +40,7 @@ export async function logout() {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ refreshToken }),
+                body: JSON.stringify({refreshToken}),
             });
         } catch {
         }
@@ -61,7 +56,7 @@ export async function register(email: string, password: string) {
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({email, password}),
     });
 
     if (!res.ok) {
@@ -78,7 +73,7 @@ export async function login(email: string, password: string) {
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({email, password}),
     });
 
     if (!res.ok) {
@@ -107,7 +102,7 @@ export async function me() {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            ...(accessToken ? {Authorization: `Bearer ${accessToken}`} : {}),
         },
     });
 

@@ -1,6 +1,8 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.entity;
 
 import jakarta.persistence.*;
+import lombok.Setter;
+
 import java.time.Instant;
 
 @Entity
@@ -13,16 +15,20 @@ public class EmailVerificationToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Setter
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Setter
     @Column(nullable = false, unique = true, length = 120)
     private String token;
 
+    @Setter
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Setter
     @Column(name = "used_at")
     private Instant usedAt;
 
@@ -32,16 +38,12 @@ public class EmailVerificationToken {
     public Long getId() { return id; }
 
     public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
 
     public String getToken() { return token; }
-    public void setToken(String token) { this.token = token; }
 
     public Instant getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
 
     public Instant getUsedAt() { return usedAt; }
-    public void setUsedAt(Instant usedAt) { this.usedAt = usedAt; }
 
     public Instant getCreatedAt() { return createdAt; }
 }

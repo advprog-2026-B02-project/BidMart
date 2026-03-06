@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {useRouter} from "next/navigation";
 import AuthShell from "@/components/AuthShell";
-import { buttonCls, inputCls } from "@/components/ui";
-import { register as apiRegister } from "@/lib/api";
+import {buttonCls, inputCls} from "@/components/ui";
+import {register as apiRegister} from "@/lib/api";
 
 export default function RegisterPage() {
     const [email, setEmail] = useState("");
@@ -27,10 +27,10 @@ export default function RegisterPage() {
         setLoading(true);
         try {
             await apiRegister(email, pass);
-            setMsg("Berhasil daftar. Cek terminal backend untuk link verifikasi jika dev mode aktif.");
-            setTimeout(() => router.push("/login"), 700);
+            setMsg("Link verifikasi baru telah dikirim! Silahkan cek email Anda.");
+            // JANGAN DIPINDAHIN ke /login PLEASE, user gabisa baca messagenya
         } catch (err: any) {
-            setMsg(err.message || "Gagal daftar.");
+            setMsg(err.message);
         } finally {
             setLoading(false);
         }
