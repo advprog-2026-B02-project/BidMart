@@ -6,37 +6,44 @@ async function parseError(res: Response | null) {
     }
 
     try {
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+
+        try {
+            data = JSON.parse(text);
+        } catch {
+            if (text.includes("<html>")) return `Terjadi kesalahan pada server (Kode: ${res.status}).`;
+            return text || `Permintaan gagal (Kode: ${res.status})`;
+        }
+
         const rawMsg = data?.message || data?.error || "";
 
-        if (rawMsg.includes("Bad credentials") || rawMsg.includes("Invalid credentials")) {
-            return "Email atau kata sandi yang Anda masukkan salah.";
+        if (rawMsg.includes("already used")) {
+            return "Link reset password ini sudah pernah digunakan.";
+        }
+        if (rawMsg.includes("expired")) {
+            return "Link reset password sudah kadaluarsa.";
+        }
+        if (rawMsg.includes("Invalid reset token") || rawMsg.includes("Invalid password token")) {
+            return "Link reset tidak valid atau tidak ditemukan.";
+        }
+
+        if (rawMsg.includes("Invalid credentials") || rawMsg.includes("Bad credentials")) {
+            return "Email atau kata sandi salah.";
+        }
+        if (rawMsg.includes("Email not found")) {
+            return "Email tidak terdaftar di sistem kami.";
         }
         if (rawMsg.includes("Email already registered")) {
-            return "Email ini sudah terdaftar. Silakan gunakan email lain atau masuk.";
+            return "Email sudah terdaftar. Silakan masuk atau gunakan email lain.";
         }
-        if (rawMsg.includes("not verified") || rawMsg.includes("disabled")) {
-            return "Akun Anda belum aktif. Silakan cek email untuk verifikasi.";
-        }
-        if (rawMsg.includes("expired") || rawMsg.includes("Invalid token")) {
-            return "Link verifikasi sudah kadaluarsa. Silakan daftar ulang atau minta link baru.";
-        }
-        if (rawMsg.includes("expired") || rawMsg.includes("Invalid token")) {
-            return "Link verifikasi sudah kadaluarsa. Silakan daftar ulang atau minta link baru.";
-        }
-        if (rawMsg.includes("already used")) {
-            return "Akun anda sudah terdaftar. Silakan masuk ke akun Anda.";
+        if (rawMsg.includes("Token already used") && !rawMsg.includes("Reset")) {
+            return "Akun Anda sudah terverifikasi. Silakan login.";
         }
 
         return rawMsg || `Terjadi kesalahan (Kode: ${res.status})`;
     } catch {
-        try {
-            const text = await res.text();
-            if (text.includes("<html>")) return `Terjadi kesalahan sistem (${res.status})`;
-            return text || `Permintaan gagal (${res.status})`;
-        } catch {
-            return "Terjadi kesalahan yang tidak terduga.";
-        }
+        return "Terjadi kesalahan sistem yang tidak terduga.";
     }
 }
 
@@ -177,6 +184,73 @@ export async function verifyEmail(token: string) {
         }
 
         return await res.text();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function forgotPassword(email: string) {
+    try {
+        const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({email}),
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return await res.text();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function resetPassword(token: string, newPass: string) {
+    try {
+        const res = await fetch(`${BASE_URL}/auth/reset-password`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({token, newPassword: newPass}),
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return await res.text();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function validateResetToken(token: string) {
+    try {
+        const res = await fetch(`${BASE_URL}/auth/reset-password/validate?token=${token}`, {
+            method: "GET",
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return true;
     } catch (err: any) {
         if (!(err instanceof Error) || err.message === "Failed to fetch") {
             const cleanMsg = await parseError(null);

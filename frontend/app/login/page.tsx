@@ -11,7 +11,7 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
     const [loading, setLoading] = useState(false);
-    const [isChecking, setIsChecking] = useState(true); // Logic pelindung biar ga flickering
+    const [isChecking, setIsChecking] = useState(true);
     const [msg, setMsg] = useState<string | null>(null);
     const router = useRouter();
 
@@ -20,7 +20,6 @@ export default function LoginPage() {
         if (token) {
             router.replace("/me");
         } else {
-            // Hanya tampilkan form jika token benar-benar tidak ada
             setIsChecking(false);
         }
     }, [router]);
@@ -35,11 +34,10 @@ export default function LoginPage() {
             router.push("/me");
         } catch (err: any) {
             setMsg(err.message);
-            setLoading(false); // Balikin state loading kalau gagal
+            setLoading(false);
         }
     }
 
-    // Tampilkan spinner tipis pas lagi ngecek token
     if (isChecking) {
         return (
             <div className="min-h-screen bg-bidcream flex items-center justify-center">
@@ -76,6 +74,12 @@ export default function LoginPage() {
                         required
                         disabled={loading}
                     />
+                </div>
+
+                <div className="flex justify-end mt-1">
+                    <Link href="/auth/forgot" className="text-sm text-sky-600 hover:underline font-medium">
+                        Lupa kata sandi?
+                    </Link>
                 </div>
 
                 <button

@@ -1,5 +1,7 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.service;
 
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.PasswordResetToken;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.PasswordResetTokenRepository;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.security.JwtService;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.User;
@@ -26,6 +28,7 @@ public class AuthService {
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
     private final EmailVerificationTokenRepository verificationTokens;
+    private final PasswordResetTokenRepository resetTokens;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private final JwtService jwtService;
@@ -36,12 +39,14 @@ public class AuthService {
     public AuthService(UserRepository users,
                        RefreshTokenRepository refreshTokens,
                        EmailVerificationTokenRepository verificationTokens,
+                       PasswordResetTokenRepository resetTokens,
                        AuthProperties authProps,
                        AppProperties appProps,
                        EmailService emailService) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.verificationTokens = verificationTokens;
+        this.resetTokens = resetTokens;
         this.authProps = authProps;
         this.appProps = appProps;
         this.jwtService = new JwtService(authProps);
@@ -93,8 +98,7 @@ public class AuthService {
 
     @Transactional
     public void verifyEmail(String token) {
-        EmailVerificationToken t = verificationTokens.findByToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+        EmailVerificationToken t = verificationTokens.findByToken(token).orElseThrow(() -> new IllegalArgumentException("Invalid token"));
 
         if (t.getUsedAt() != null) throw new IllegalArgumentException("Token already used");
         if (t.getExpiresAt().isBefore(Instant.now())) throw new IllegalArgumentException("Token expired");
@@ -109,8 +113,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(String email, String rawPassword) {
-        User u = users.findByEmail(email.toLowerCase().trim())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+        User u = users.findByEmail(email.toLowerCase().trim()).orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
         if (!passwordEncoder.matches(rawPassword, u.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid credentials");
@@ -134,8 +137,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse refresh(String refreshToken) {
-        RefreshToken rt = refreshTokens.findByToken(refreshToken)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        RefreshToken rt = refreshTokens.findByToken(refreshToken).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
 
         if (rt.isRevoked()) throw new IllegalArgumentException("Refresh token revoked");
         if (rt.getExpiresAt().isBefore(Instant.now())) throw new IllegalArgumentException("Refresh token expired");
@@ -147,8 +149,7 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshToken) {
-        RefreshToken rt = refreshTokens.findByToken(refreshToken)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        RefreshToken rt = refreshTokens.findByToken(refreshToken).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
         rt.setRevoked(true);
         refreshTokens.save(rt);
     }
@@ -157,5 +158,57 @@ public class AuthService {
         byte[] bytes = new byte[48];
         new SecureRandom().nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    @Transactional
+    public void forgotPassword(String email) {
+        User u = users.findByEmail(email.toLowerCase().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Email not found"));
+
+        resetTokens.deleteByUserAndUsedAtIsNull(u);
+
+        PasswordResetToken t = new PasswordResetToken();
+        t.setUser(u);
+        t.setToken(UUID.randomUUID().toString());
+        t.setExpiresAt(Instant.now().plusSeconds(3600)); // expired in 1 hour
+        resetTokens.save(t);
+
+        String link = appProps.getBaseUrl() + "/auth/reset?token=" + t.getToken();
+        emailService.sendResetPasswordEmail(u.getEmail(), link);
+    }
+
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken t = resetTokens.findByToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid reset token"));
+
+        if (t.getUsedAt() != null) {
+            throw new IllegalArgumentException("Reset token already used");
+        }
+        if (t.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Reset token expired");
+        }
+
+        User u = t.getUser();
+        u.setPasswordHash(passwordEncoder.encode(newPassword));
+        users.save(u);
+
+        t.setUsedAt(Instant.now());
+        resetTokens.save(t);
+
+        resetTokens.flush();
+    }
+
+    @Transactional(readOnly = true)
+    public void validateResetToken(String token) {
+        PasswordResetToken t = resetTokens.findByToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid reset token"));
+
+        if (t.getUsedAt() != null) {
+            throw new IllegalArgumentException("Reset token already used");
+        }
+        if (t.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Reset token expired");
+        }
     }
 }

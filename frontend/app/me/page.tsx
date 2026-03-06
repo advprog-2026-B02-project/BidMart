@@ -14,7 +14,6 @@ export default function MePage() {
         (async () => {
             try {
                 const data = await me();
-                // Kita coba ambil email atau username, fallback ke principal atau 'User'
                 const userDisplayName = data?.email || data?.username || data?.principal || "User";
                 setPrincipal(userDisplayName);
                 setMsg("");
@@ -29,7 +28,6 @@ export default function MePage() {
             await logout();
             router.push("/login");
         } catch (err) {
-            // Tetap pindah ke login jika logout gagal
             router.push("/login");
         }
     }
