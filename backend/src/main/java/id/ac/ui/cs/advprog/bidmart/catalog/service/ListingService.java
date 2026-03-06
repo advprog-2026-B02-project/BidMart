@@ -1,11 +1,11 @@
 package id.ac.ui.cs.advprog.bidmart.catalog.service;
 
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.CreateListingRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.ModerationRequest.ModerateListingRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.UpdateListingRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.ListingDetailResponse;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.ListingResponse;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.ListingSummaryResponse;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.CreateListingRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ModerationRequest.ModerateListingRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.UpdateListingRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingDetailResponse;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingResponse;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingSummaryResponse;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.ListingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

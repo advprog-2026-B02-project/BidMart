@@ -111,4 +111,16 @@ public class Listing {
     @Builder.Default
     private List<ListingImage> images = new ArrayList<>();
 
+    public Instant getAuctionEndTime() {
+        if (activatedAt == null) return null;
+        return activatedAt.plusSeconds(auctionDuration);
+    }
+
+    public boolean isAuctionOngoing() {
+        Instant endTime = getAuctionEndTime();
+        return status == ListingStatus.ACTIVE
+                && endTime != null
+                && Instant.now().isBefore(endTime);
+    }
+
 }

@@ -1,16 +1,12 @@
-package id.ac.ui.cs.advprog.bidmart.catalog.service.impl;
+package id.ac.ui.cs.advprog.bidmart.catalog.service;
 
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.CreateListingRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.ListingImageRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.ModerationRequest.Action;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.ModerationRequest.ModerateListingRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.UpdateListingRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.ListingDetailResponse;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.ListingResponse;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.ListingSummaryResponse;
-import id.ac.ui.cs.advprog.bidmart.catalog.exception.ForbiddenException;
-import id.ac.ui.cs.advprog.bidmart.catalog.exception.InvalidStatusTransitionException;
-import id.ac.ui.cs.advprog.bidmart.catalog.exception.ResourceNotFoundException;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.CreateListingRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingImageRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ModerationRequest.ModerateListingRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.UpdateListingRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingDetailResponse;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingResponse;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingSummaryResponse;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.ListingImage;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.ListingStatus;
@@ -20,8 +16,10 @@ import id.ac.ui.cs.advprog.bidmart.catalog.service.ListingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -32,8 +30,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ListingServiceImpl implements ListingService {
 
-    private final ListingRepository listingRepository;
+    private final ListingRepository  listingRepository;
     private final CategoryRepository categoryRepository;
+
+    // ── Create ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -61,6 +61,8 @@ public class ListingServiceImpl implements ListingService {
         return ListingResponse.from(listingRepository.save(listing));
     }
 
+    // ── Read ──────────────────────────────────────────────────────────────────
+
     @Override
     @Transactional(readOnly = true)
     public ListingDetailResponse findDetailById(UUID id) {
@@ -84,12 +86,13 @@ public class ListingServiceImpl implements ListingService {
             Instant endsBefore,
             Pageable pageable
     ) {
-        // Hanya tampilkan listing ACTIVE di katalog pembeli
         return listingRepository
                 .findByFilters(keyword, categoryId, ListingStatus.ACTIVE,
                         minPrice, maxPrice, endsBefore, pageable)
                 .map(ListingSummaryResponse::from);
     }
+
+    // ── Update ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -98,26 +101,29 @@ public class ListingServiceImpl implements ListingService {
         assertOwner(listing, sellerId);
 
         if (listing.getStatus() == ListingStatus.CLOSED) {
-            throw new IllegalStateException("Listing yang sudah CLOSED tidak dapat diubah.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Listing yang sudah CLOSED tidak dapat diubah.");
         }
         if (listing.getStatus() == ListingStatus.ACTIVE && listing.getBidCount() > 0) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Listing tidak dapat diubah setelah ada penawaran masuk.");
         }
 
-        if (request.getCategoryId()     != null) {
+        if (request.getCategoryId()       != null) {
             validateCategoryExists(request.getCategoryId());
             listing.setCategoryId(request.getCategoryId());
         }
-        if (request.getTitle()          != null) listing.setTitle(request.getTitle());
-        if (request.getDescription()    != null) listing.setDescription(request.getDescription());
-        if (request.getStartingPrice()  != null) listing.setStartingPrice(request.getStartingPrice());
-        if (request.getReservePrice()   != null) listing.setReservePrice(request.getReservePrice());
+        if (request.getTitle()            != null) listing.setTitle(request.getTitle());
+        if (request.getDescription()      != null) listing.setDescription(request.getDescription());
+        if (request.getStartingPrice()    != null) listing.setStartingPrice(request.getStartingPrice());
+        if (request.getReservePrice()     != null) listing.setReservePrice(request.getReservePrice());
         if (request.getMinimumIncrement() != null) listing.setMinimumIncrement(request.getMinimumIncrement());
         if (request.getAuctionDuration()  != null) listing.setAuctionDuration(request.getAuctionDuration());
 
         return ListingResponse.from(listingRepository.save(listing));
     }
+
+    // ── Activate (DRAFT → ACTIVE) ─────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -126,15 +132,18 @@ public class ListingServiceImpl implements ListingService {
         assertOwner(listing, sellerId);
 
         if (listing.getStatus() != ListingStatus.DRAFT) {
-            throw new InvalidStatusTransitionException(listing.getStatus(), ListingStatus.ACTIVE);
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Transisi status tidak valid: " + listing.getStatus() + " → ACTIVE");
         }
 
         listing.setStatus(ListingStatus.ACTIVE);
-        listing.setActivatedAt(Instant.now());        // catat waktu mulai lelang
+        listing.setActivatedAt(Instant.now());
         listing.setCurrentPrice(listing.getStartingPrice());
 
         return ListingResponse.from(listingRepository.save(listing));
     }
+
+    // ── Cancel ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -143,16 +152,19 @@ public class ListingServiceImpl implements ListingService {
         assertOwner(listing, sellerId);
 
         if (listing.getBidCount() > 0) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Listing tidak dapat dibatalkan setelah ada penawaran masuk.");
         }
         if (listing.getStatus() == ListingStatus.CLOSED) {
-            throw new IllegalStateException("Listing sudah berstatus CLOSED.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Listing sudah berstatus CLOSED.");
         }
 
         listing.setStatus(ListingStatus.CLOSED);
         listingRepository.save(listing);
     }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -161,13 +173,14 @@ public class ListingServiceImpl implements ListingService {
         assertOwner(listing, sellerId);
 
         if (listing.getStatus() != ListingStatus.DRAFT) {
-            throw new IllegalStateException("Hanya listing DRAFT yang dapat dihapus.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Hanya listing DRAFT yang dapat dihapus.");
         }
 
         listingRepository.delete(listing);
     }
 
-
+    // ── Admin ─────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
@@ -184,7 +197,8 @@ public class ListingServiceImpl implements ListingService {
         switch (request.getAction()) {
             case APPROVE -> {
                 if (listing.getStatus() != ListingStatus.DRAFT) {
-                    throw new IllegalStateException("Hanya listing DRAFT yang dapat disetujui.");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Hanya listing DRAFT yang dapat disetujui.");
                 }
                 listing.setStatus(ListingStatus.ACTIVE);
                 listing.setActivatedAt(Instant.now());
@@ -192,7 +206,8 @@ public class ListingServiceImpl implements ListingService {
             }
             case REJECT, DELETE -> {
                 if (listing.getStatus() == ListingStatus.CLOSED) {
-                    throw new IllegalStateException("Listing sudah berstatus CLOSED.");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Listing sudah berstatus CLOSED.");
                 }
                 listing.setStatus(ListingStatus.CLOSED);
             }
@@ -201,48 +216,54 @@ public class ListingServiceImpl implements ListingService {
         return ListingResponse.from(listingRepository.save(listing));
     }
 
+    // ── [LOGIC] Validasi listing untuk penawaran ──────────────────────────────
+
     @Override
     @Transactional(readOnly = true)
     public void validateListingForBid(UUID listingId) {
         Listing listing = getOrThrow(listingId);
 
         if (listing.getStatus() != ListingStatus.ACTIVE) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Listing tidak aktif. Status saat ini: " + listing.getStatus());
         }
-
         if (!listing.isAuctionOngoing()) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Waktu lelang sudah berakhir pada: " + listing.getAuctionEndTime());
         }
     }
+
+    // ── [LOGIC] Sinkronisasi harga dari bid service ───────────────────────────
 
     @Override
     @Transactional
     public void syncPrice(UUID listingId, BigDecimal newPrice, int bidCount) {
         int updated = listingRepository.syncPrice(listingId, newPrice, bidCount);
         if (updated == 0) {
-            throw new ResourceNotFoundException("Listing tidak ditemukan: " + listingId);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Listing tidak ditemukan: " + listingId);
         }
     }
 
-
+    // ── Private helpers ───────────────────────────────────────────────────────
 
     private Listing getOrThrow(UUID id) {
         return listingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Listing tidak ditemukan: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Listing tidak ditemukan: " + id));
     }
 
     private void assertOwner(Listing listing, UUID sellerId) {
         if (!listing.getSellerId().equals(sellerId)) {
-            throw new ForbiddenException("Anda bukan pemilik listing ini.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Anda bukan pemilik listing ini.");
         }
     }
 
     private void validateCategoryExists(UUID categoryId) {
         if (!categoryRepository.existsById(categoryId)) {
-            throw new ResourceNotFoundException("Category tidak ditemukan: " + categoryId);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Category tidak ditemukan: " + categoryId);
         }
     }
 

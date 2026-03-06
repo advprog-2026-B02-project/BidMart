@@ -1,16 +1,17 @@
 package id.ac.ui.cs.advprog.bidmart.catalog.service;
 
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.request.CreateCategoryRequest;
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.response.CategoryResponse;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.CreateCategoryRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.CategoryResponse;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.Category;
 import id.ac.ui.cs.advprog.bidmart.catalog.repository.CategoryRepository;
 import id.ac.ui.cs.advprog.bidmart.catalog.service.CategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Service
@@ -22,20 +23,21 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     public CategoryResponse create(CreateCategoryRequest request) {
-        if (categoryRepository.existsBySlug(request.slug())) {
-            throw new IllegalArgumentException("Slug already has been used: " + request.slug());
+        if (categoryRepository.existsBySlug(request.getSlug())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Slug sudah digunakan: " + request.getSlug());
         }
 
         Category parent = null;
-        if (request.parentId() != null) {
-            parent = categoryRepository.findById(request.parentId())
-                    .orElseThrow(() -> new NoSuchElementException(
-                            "Parent category not found: " + request.parentId()));
+        if (request.getParentId() != null) {
+            parent = categoryRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Parent category tidak ditemukan: " + request.getParentId()));
         }
 
         Category category = Category.builder()
-                .name(request.name())
-                .slug(request.slug())
+                .name(request.getName())
+                .slug(request.getSlug())
                 .parent(parent)
                 .build();
 
@@ -45,9 +47,10 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional(readOnly = true)
     public CategoryResponse findById(UUID id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Category not found: " + id));
-        return CategoryResponse.from(category);
+        return categoryRepository.findById(id)
+                .map(CategoryResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Category tidak ditemukan: " + id));
     }
 
     @Override
@@ -63,10 +66,12 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public void delete(UUID id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Category not found: " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Category tidak ditemukan: " + id));
 
         if (!category.getChildren().isEmpty()) {
-            throw new IllegalStateException("Cannot delete category that has sub-category");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Tidak bisa menghapus kategori yang masih punya sub-kategori.");
         }
 
         categoryRepository.delete(category);
