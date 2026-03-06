@@ -8,8 +8,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Your custom BidMart Colors */
+  --color-bidnavy: #003060;
+  --color-bidnavy2: #00162D;
+  --color-bidcream: #F1E9D9;
+
+  /* Your custom Font */
+  --font-sans: var(--font-plus-jakarta), system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +28,4 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
