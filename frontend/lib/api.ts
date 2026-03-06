@@ -78,6 +78,7 @@ export async function logout() {
                 body: JSON.stringify({refreshToken}),
             });
         } catch (e) {
+            throw e; // just throw it
         }
     }
 

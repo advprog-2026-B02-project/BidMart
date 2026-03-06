@@ -28,7 +28,7 @@ export default function MePage() {
             await logout();
             router.push("/login");
         } catch (err) {
-            router.push("/login");
+            // do nothing
         }
     }
 
