@@ -186,65 +186,55 @@ export default function WalletPage() {
     const isBusy = syncing || acting;
 
     return (
-        <main className="min-h-screen bg-slate-950 text-slate-100">
-            <section className="bg-slate-900 text-center py-10 shadow-md">
-                <p className="text-sm uppercase tracking-widest text-emerald-400">
+        <main className="min-h-screen bg-[#F1E9D9] text-[#003060]">
+            <section className="bg-gradient-to-r from-[#003060] to-[#00162D] py-10 text-center text-[#F1E9D9] shadow-md">
+                <p className="text-sm uppercase tracking-[0.5em] opacity-80">
                     BidMart internal metrics
                 </p>
                 <p className="mt-2 text-4xl font-mono font-semibold">
-                    Views: <span className="text-emerald-300">{views}</span>
+                    Views: <span>{views}</span>
                 </p>
-                <p className="text-xs text-slate-500">
-                    Demo user: {DEMO_USER_ID}
-                </p>
+                <p className="text-xs opacity-70">Demo user: {DEMO_USER_ID}</p>
             </section>
 
             <section className="mx-auto w-full max-w-5xl px-6 py-10">
                 <header className="mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">
-                            Wallet Simulator 
+                        <h1 className="text-3xl font-bold">
+                            Wallet Backend Integrated Simulator
                         </h1>
                     </div>
                     <button
                         onClick={syncWallet}
-                        className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:border-emerald-400"
+                        className="rounded-lg border border-[#003060] px-4 py-2 text-sm font-semibold transition hover:bg-[#003060] hover:text-[#F1E9D9]"
                     >
                         Refresh balances
                     </button>
                 </header>
 
                 <div className="grid gap-6 md:grid-cols-2">
-                    <div className="rounded-xl bg-slate-900/80 p-6">
-                        <h2 className="text-lg font-semibold text-white">
-                            Balances
-                        </h2>
+                    <div className="rounded-xl bg-white/80 p-6 shadow">
+                        <h2 className="text-lg font-semibold">Balances</h2>
                         <div className="mt-4 space-y-3 font-mono">
-                            <div className="rounded-lg bg-slate-800/80 p-4">
-                                <p className="text-sm text-slate-400">
-                                    Current Balance
-                                </p>
-                                <p className="text-2xl text-emerald-300">
+                            <div className="rounded-lg bg-[#003060]/5 p-4">
+                                <p className="text-sm opacity-80">Current Balance</p>
+                                <p className="text-2xl font-semibold">
                                     {wallet
                                         ? formatAmount.format(wallet.availableBalance)
                                         : "—"}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-slate-800/80 p-4">
-                                <p className="text-sm text-slate-400">
-                                    Held Balance
-                                </p>
-                                <p className="text-2xl text-amber-300">
+                            <div className="rounded-lg bg-[#003060]/5 p-4">
+                                <p className="text-sm opacity-80">Held Balance</p>
+                                <p className="text-2xl font-semibold">
                                     {wallet
                                         ? formatAmount.format(wallet.heldBalance)
                                         : "—"}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-slate-800/80 p-4">
-                                <p className="text-sm text-slate-400">
-                                    Last Updated
-                                </p>
-                                <p className="text-xl text-white">
+                            <div className="rounded-lg bg-[#003060]/5 p-4">
+                                <p className="text-sm opacity-80">Last Updated</p>
+                                <p className="text-xl">
                                     {wallet?.updatedAt
                                         ? new Date(wallet.updatedAt).toLocaleString(
                                               "id-ID",
@@ -252,11 +242,9 @@ export default function WalletPage() {
                                         : "—"}
                                 </p>
                             </div>
-                            <div className="rounded-lg bg-slate-800/80 p-4">
-                                <p className="text-sm text-slate-400">
-                                    Active Hold
-                                </p>
-                                <p className="text-sm text-white break-all">
+                            <div className="rounded-lg bg-[#003060]/5 p-4">
+                                <p className="text-sm opacity-80">Active Hold</p>
+                                <p className="break-all text-sm">
                                     {activeHold
                                         ? `${activeHold.holdId} (${activeHold.status})`
                                         : "No hold"}
@@ -265,21 +253,19 @@ export default function WalletPage() {
                         </div>
                     </div>
 
-                    <div className="rounded-xl bg-slate-900/80 p-6">
-                        <h2 className="text-lg font-semibold text-white">
-                            Actions
-                        </h2>
+                    <div className="rounded-xl bg-white/80 p-6 shadow">
+                        <h2 className="text-lg font-semibold">Actions</h2>
                         <div className="mt-4 space-y-4">
                             <div className="flex flex-wrap gap-3">
                                 <button
-                                    className="rounded-lg bg-emerald-500 px-4 py-2 font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
+                                    className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
                                     onClick={syncWallet}
                                     disabled={isBusy}
                                 >
                                     Create Wallet
                                 </button>
                                 <button
-                                    className="rounded-lg border border-slate-700 px-4 py-2 font-semibold hover:border-slate-500 disabled:opacity-60"
+                                    className="rounded-lg border border-[#003060] px-4 py-2 font-semibold transition hover:bg-[#003060] hover:text-[#F1E9D9] disabled:opacity-60"
                                     onClick={handleReset}
                                     disabled={isBusy}
                                 >
@@ -288,19 +274,19 @@ export default function WalletPage() {
                             </div>
 
                             <div>
-                                <label className="text-sm text-slate-400">
+                                <label className="text-sm text-[#003060]/80">
                                     Top Up Amount (IDR)
                                 </label>
                                 <div className="mt-2 flex gap-3">
                                     <input
                                         type="number"
-                                        className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-emerald-400 focus:outline-none"
+                                        className="flex-1 rounded-lg border border-[#003060]/40 bg-[#F1E9D9] px-3 py-2 text-[#003060] focus:border-[#003060] focus:outline-none"
                                         value={topUpInput}
                                         onChange={(e) => setTopUpInput(e.target.value)}
                                         disabled={isBusy}
                                     />
                                     <button
-                                        className="rounded-lg bg-blue-500 px-4 py-2 font-semibold text-slate-950 hover:bg-blue-400 disabled:opacity-60"
+                                        className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
                                         onClick={handleTopUp}
                                         disabled={isBusy}
                                     >
@@ -310,19 +296,19 @@ export default function WalletPage() {
                             </div>
 
                             <div>
-                                <label className="text-sm text-slate-400">
+                                <label className="text-sm text-[#003060]/80">
                                     Bid Amount (IDR)
                                 </label>
                                 <div className="mt-2 flex gap-3">
                                     <input
                                         type="number"
-                                        className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-emerald-400 focus:outline-none"
+                                        className="flex-1 rounded-lg border border-[#003060]/40 bg-[#F1E9D9] px-3 py-2 text-[#003060] focus:border-[#003060] focus:outline-none"
                                         value={bidInput}
                                         onChange={(e) => setBidInput(e.target.value)}
                                         disabled={isBusy}
                                     />
                                     <button
-                                        className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60"
+                                        className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
                                         onClick={() =>
                                             handleBid(
                                                 Number(bidInput),
@@ -337,19 +323,19 @@ export default function WalletPage() {
                             </div>
 
                             <div>
-                                <label className="text-sm text-slate-400">
+                                <label className="text-sm text-[#003060]/80">
                                     Raise Amount (IDR)
                                 </label>
                                 <div className="mt-2 flex gap-3">
                                     <input
                                         type="number"
-                                        className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-emerald-400 focus:outline-none"
+                                        className="flex-1 rounded-lg border border-[#003060]/40 bg-[#F1E9D9] px-3 py-2 text-[#003060] focus:border-[#003060] focus:outline-none"
                                         value={raiseInput}
                                         onChange={(e) => setRaiseInput(e.target.value)}
                                         disabled={isBusy}
                                     />
                                     <button
-                                        className="rounded-lg bg-purple-500 px-4 py-2 font-semibold text-slate-950 hover:bg-purple-400 disabled:opacity-60"
+                                        className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
                                         onClick={() =>
                                             handleBid(
                                                 Number(raiseInput) +
@@ -365,7 +351,7 @@ export default function WalletPage() {
                             </div>
 
                             <button
-                                className="w-full rounded-lg bg-slate-700 px-4 py-2 font-semibold hover:bg-slate-600 disabled:opacity-60"
+                                className="w-full rounded-lg border border-[#003060] px-4 py-2 font-semibold transition hover:bg-[#003060] hover:text-[#F1E9D9] disabled:opacity-60"
                                 onClick={handleReleaseHold}
                                 disabled={isBusy}
                             >
@@ -375,11 +361,11 @@ export default function WalletPage() {
                     </div>
                 </div>
 
-                <div className="mt-8 rounded-xl bg-slate-900/80 p-4 text-sm text-slate-300">
-                    <p className="font-semibold text-white">Status</p>
+                <div className="mt-8 rounded-xl bg-white/80 p-4 text-sm text-[#003060] shadow">
+                    <p className="font-semibold">Status</p>
                     <p>{status}</p>
                     {isBusy && (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[#003060]/70">
                             Talking to backend...
                         </p>
                     )}
