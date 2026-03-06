@@ -11,6 +11,7 @@ public interface WalletService {
 
     WalletResponse getWallet(UUID userId);
     WalletResponse topUp(UUID userId, TopUpRequest request);
+    WalletResponse resetWallet(UUID userId); // sementara
 
     HoldResponse createHold(HoldRequest request);
     HoldResponse releaseHold(UUID holdId);

@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmart.wallet.service;
 
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.HoldRequest;
@@ -17,7 +18,9 @@ import id.ac.ui.cs.advprog.bidmart.wallet.repository.BalanceHoldRepository;
 import id.ac.ui.cs.advprog.bidmart.wallet.repository.WalletRepository;
 import id.ac.ui.cs.advprog.bidmart.wallet.repository.WalletTransactionRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
 
+@Service
 public class WalletServiceImpl implements WalletService {
     private WalletRepository walletRepository;
     private BalanceHoldRepository balanceHoldRepository;
@@ -44,6 +47,25 @@ public class WalletServiceImpl implements WalletService {
         wallet.setAvailableBalance(wallet.getAvailableBalance() + request.getAmount());
         wallet.setUpdatedAt(LocalDateTime.now());
         walletRepository.save(wallet);
+        saveTransaction(wallet, TransactionType.TOPUP,
+                         "Top-up saldo", request.getAmount(), null);
+
+        return walletToWalletResponse(wallet);
+    }
+
+    @Transactional // sementara buat demo cara kerja wallet di fe
+    public WalletResponse resetWallet(UUID userId) {
+        Wallet wallet = findOrCreateWallet(userId);
+        List<BalanceHold> holds = balanceHoldRepository.findAllByWalletId(wallet.getId());
+        holds.stream()
+                .filter(hold -> hold.getStatus() == HoldStatus.ACTIVE)
+                .forEach(hold -> releaseHoldInternal(wallet, hold));
+
+        wallet.setAvailableBalance(0);
+        wallet.setHeldBalance(0);
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
         return walletToWalletResponse(wallet);
     }
 
