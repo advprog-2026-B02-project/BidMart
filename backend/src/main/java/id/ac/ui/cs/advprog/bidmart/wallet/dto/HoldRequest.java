@@ -1,14 +1,14 @@
 package id.ac.ui.cs.advprog.bidmart.wallet.dto;
 
-import jakarta.annotation.Nonnull;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -17,10 +17,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class HoldRequest {
 
-    @Nonnull
     private UUID userId;
 
-    @Nonnull
+    @NotNull
     private UUID auctionId;
 
     private UUID bidId;
