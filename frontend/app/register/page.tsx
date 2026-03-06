@@ -2,7 +2,6 @@
 
 import {useState} from "react";
 import Link from "next/link";
-import {useRouter} from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import {buttonCls, inputCls} from "@/components/ui";
 import {register as apiRegister} from "@/lib/api";
@@ -13,7 +12,6 @@ export default function RegisterPage() {
     const [pass2, setPass2] = useState("");
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
-    const router = useRouter();
 
     async function onSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -29,8 +27,8 @@ export default function RegisterPage() {
             await apiRegister(email, pass);
             setMsg("Link verifikasi baru telah dikirim! Silahkan cek email Anda.");
             // JANGAN DIPINDAHIN ke /login PLEASE, user gabisa baca messagenya
-        } catch (err: any) {
-            setMsg(err.message);
+        } catch (err: unknown) {
+            setMsg(err instanceof Error ? err.message : "Gagal mendaftarkan akun.");
         } finally {
             setLoading(false);
         }

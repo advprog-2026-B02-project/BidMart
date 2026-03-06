@@ -22,8 +22,12 @@ export default function LoginPage() {
         try {
             await apiLogin(email, pass);
             router.push("/me");
-        } catch (err: any) {
-            setMsg(err.message);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setMsg(err.message);
+            } else {
+                setMsg("Terjadi kesalahan saat masuk.");
+            }
         } finally {
             setLoading(false);
         }

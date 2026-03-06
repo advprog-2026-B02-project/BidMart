@@ -17,8 +17,10 @@ export default function MePage() {
                 const data = await me();
                 setPrincipal(data?.principal ?? "User");
                 setMsg("");
-            } catch (err: any) {
-                setMsg(err?.message || "Belum login / sesi habis.");
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : "Belum login / sesi habis.";
+                setMsg(message);
             }
         })();
     }, []);

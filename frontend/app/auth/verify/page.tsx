@@ -10,13 +10,14 @@ function VerifyContent() {
     const router = useRouter();
     const token = searchParams.get("token");
 
-    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-    const [msg, setMsg] = useState("");
+    const initialStatus: "loading" | "success" | "error" = token ? "loading" : "error";
+    const initialMessage = token ? "" : "Token verifikasi tidak ditemukan.";
+
+    const [status, setStatus] = useState<"loading" | "success" | "error">(initialStatus);
+    const [msg, setMsg] = useState(initialMessage);
 
     useEffect(() => {
         if (!token) {
-            setStatus("error");
-            setMsg("Token verifikasi tidak ditemukan.");
             return;
         }
 
@@ -34,7 +35,7 @@ function VerifyContent() {
                     setStatus("error");
                     setMsg(data.message || "Verifikasi gagal.");
                 }
-            } catch (err) {
+            } catch {
                 setStatus("error");
                 setMsg("Gagal menghubungi server.");
             }
