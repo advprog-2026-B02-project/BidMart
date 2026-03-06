@@ -174,6 +174,38 @@ export default function WalletPage() {
         });
     };
 
+    const handleRaiseBid = () => {
+        if (!activeHold) {
+            setStatus("Place a bid before raising.");
+            return;
+        }
+        const increment = Number(raiseInput);
+        if (!Number.isFinite(increment) || increment <= 0) {
+            setStatus("Raise amount must be positive.");
+            return;
+        }
+        const newAmount = activeHold.amount + increment;
+        runAction(`Bid raised to ${formatAmount.format(newAmount)}.`, async () => {
+            await request<HoldResponse>(
+                `/api/wallets/holds/${activeHold.holdId}/release`,
+                {method: "POST"},
+            );
+            const response = await request<HoldResponse>(
+                `/api/wallets/${DEMO_USER_ID}/holds`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        userId: DEMO_USER_ID,
+                        auctionId: DEMO_AUCTION_ID,
+                        bidId: randomId(),
+                        amount: newAmount,
+                    }),
+                },
+            );
+            setActiveHold(response);
+        });
+    };
+
     const handleReset = () => {
         runAction("Wallet reset to zero.", async () => {
             await request(`/api/wallets/${DEMO_USER_ID}/reset`, {
@@ -336,13 +368,7 @@ export default function WalletPage() {
                                     />
                                     <button
                                         className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
-                                        onClick={() =>
-                                            handleBid(
-                                                Number(raiseInput) +
-                                                    (activeHold?.amount ?? 0),
-                                                "Bid raised.",
-                                            )
-                                        }
+                                        onClick={handleRaiseBid}
                                         disabled={isBusy}
                                     >
                                         Raise Bid
