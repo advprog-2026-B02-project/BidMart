@@ -1,6 +1,6 @@
-package id.ac.ui.cs.advprog.bidmart.backend.security;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.security;
 
-import id.ac.ui.cs.advprog.bidmart.backend.config.AuthProperties;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

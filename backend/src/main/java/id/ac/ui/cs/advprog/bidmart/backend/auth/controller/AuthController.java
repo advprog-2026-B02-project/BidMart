@@ -1,10 +1,10 @@
-package id.ac.ui.cs.advprog.bidmart.backend.controller;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.controller;
 
-import id.ac.ui.cs.advprog.bidmart.backend.dto.AuthResponse;
-import id.ac.ui.cs.advprog.bidmart.backend.dto.LoginRequest;
-import id.ac.ui.cs.advprog.bidmart.backend.dto.RefreshRequest;
-import id.ac.ui.cs.advprog.bidmart.backend.dto.RegisterRequest;
-import id.ac.ui.cs.advprog.bidmart.backend.service.AuthService;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.AuthResponse;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RefreshRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RegisterRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.backend.config;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

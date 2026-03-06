@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.backend.dto;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.dto;
 
 public class AuthResponse {
     public String accessToken;

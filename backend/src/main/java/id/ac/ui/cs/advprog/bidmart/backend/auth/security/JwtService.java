@@ -1,6 +1,6 @@
-package id.ac.ui.cs.advprog.bidmart.backend.security;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.security;
 
-import id.ac.ui.cs.advprog.bidmart.backend.config.AuthProperties;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

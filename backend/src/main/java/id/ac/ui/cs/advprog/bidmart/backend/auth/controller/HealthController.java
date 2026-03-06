@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.backend.controller;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

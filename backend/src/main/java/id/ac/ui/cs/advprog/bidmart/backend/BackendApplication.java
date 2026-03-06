@@ -1,7 +1,7 @@
 package id.ac.ui.cs.advprog.bidmart.backend;
 
-import id.ac.ui.cs.advprog.bidmart.backend.config.AppProperties;
-import id.ac.ui.cs.advprog.bidmart.backend.config.AuthProperties;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AppProperties;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

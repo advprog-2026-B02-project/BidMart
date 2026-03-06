@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.backend.entity;
+package id.ac.ui.cs.advprog.bidmart.backend.auth.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;
