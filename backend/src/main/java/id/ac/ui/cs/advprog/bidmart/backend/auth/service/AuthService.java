@@ -1,4 +1,5 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.service;
+
 import id.ac.ui.cs.advprog.bidmart.backend.auth.security.JwtService;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.User;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -27,6 +29,7 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private final JwtService jwtService;
+    private final EmailService emailService;
     private final AuthProperties authProps;
     private final AppProperties appProps;
 
@@ -34,36 +37,58 @@ public class AuthService {
                        RefreshTokenRepository refreshTokens,
                        EmailVerificationTokenRepository verificationTokens,
                        AuthProperties authProps,
-                       AppProperties appProps) {
+                       AppProperties appProps,
+                       EmailService emailService) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.verificationTokens = verificationTokens;
         this.authProps = authProps;
         this.appProps = appProps;
         this.jwtService = new JwtService(authProps);
+        this.emailService = emailService;
     }
 
     @Transactional
     public void register(String email, String rawPassword) {
         String normalized = email.toLowerCase().trim();
-        if (users.existsByEmail(normalized)) {
-            throw new IllegalArgumentException("Email already registered");
+
+        Optional<User> existingUser = users.findByEmail(normalized);
+
+        if (existingUser.isPresent()) {
+            User u = existingUser.get();
+            if (u.isEmailVerified()) {
+                throw new IllegalArgumentException("Email already registered");
+            }
+
+            u.setPasswordHash(passwordEncoder.encode(rawPassword));
+            users.save(u);
+
+            sendVerificationProcedure(u);
+            return;
         }
 
         User u = new User();
         u.setEmail(normalized);
         u.setPasswordHash(passwordEncoder.encode(rawPassword));
         u.setEmailVerified(false);
-
         users.save(u);
+
+        sendVerificationProcedure(u);
+    }
+
+    private void sendVerificationProcedure(User u) {
+        verificationTokens.deleteByUserAndUsedAtIsNull(u);
 
         EmailVerificationToken t = new EmailVerificationToken();
         t.setUser(u);
         t.setToken(UUID.randomUUID().toString());
+
+        // expired in 24 hours
         t.setExpiresAt(Instant.now().plusSeconds(60 * 60 * 24));
         verificationTokens.save(t);
+
         String link = appProps.getBaseUrl() + "/auth/verify?token=" + t.getToken();
-        System.out.println("[EMAIL-VERIFY] " + link);
+        emailService.sendVerificationEmail(u.getEmail(), link);
     }
 
     @Transactional
