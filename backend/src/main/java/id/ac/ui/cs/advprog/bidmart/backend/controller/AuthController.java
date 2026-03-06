@@ -1,6 +1,9 @@
 package id.ac.ui.cs.advprog.bidmart.backend.controller;
 
-import id.ac.ui.cs.advprog.bidmart.backend.dto.*;
+import id.ac.ui.cs.advprog.bidmart.backend.dto.AuthResponse;
+import id.ac.ui.cs.advprog.bidmart.backend.dto.LoginRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.dto.RefreshRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.bidmart.backend.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -24,9 +27,9 @@ public class AuthController {
     }
 
     @GetMapping("/verify")
-    public ResponseEntity<Void> verify(@RequestParam("token") String token) {
+    public ResponseEntity<String> verify(@RequestParam("token") String token) {
         auth.verifyEmail(token);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok("Email berhasil diverifikasi. Silakan login.");
     }
 
     @PostMapping("/login")

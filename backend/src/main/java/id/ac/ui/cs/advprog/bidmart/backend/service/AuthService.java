@@ -7,7 +7,6 @@ import id.ac.ui.cs.advprog.bidmart.backend.entity.EmailVerificationToken;
 import id.ac.ui.cs.advprog.bidmart.backend.repository.UserRepository;
 import id.ac.ui.cs.advprog.bidmart.backend.repository.RefreshTokenRepository;
 import id.ac.ui.cs.advprog.bidmart.backend.repository.EmailVerificationTokenRepository;
-import id.ac.ui.cs.advprog.bidmart.backend.security.JwtService;
 import id.ac.ui.cs.advprog.bidmart.backend.config.AuthProperties;
 import id.ac.ui.cs.advprog.bidmart.backend.config.AppProperties;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;

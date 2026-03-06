@@ -9,14 +9,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.util.AntPathMatcher;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
-    private final AntPathMatcher matcher = new AntPathMatcher();
 
     public JwtAuthFilter(AuthProperties props) {
         this.jwtService = new JwtService(props);
@@ -25,14 +24,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return uri.startsWith("/auth") || uri.equals("/health");
+
+        return uri.equals("/auth/register")
+                || uri.equals("/auth/login")
+                || uri.equals("/auth/verify")
+                || uri.equals("/auth/refresh")
+                || uri.equals("/health");
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
             throws ServletException, IOException {
 
         String header = request.getHeader("Authorization");
+
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -42,10 +49,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             var claims = jwtService.parseClaims(token);
+
+            Long userId = Long.valueOf(claims.getSubject()); // read userId from subject
             String email = claims.get("email", String.class);
-            var auth = new UsernamePasswordAuthenticationToken(email, null, List.of());
+
+            Map<String, Object> principal = Map.of(
+                    "userId", userId,
+                    "email", email
+            );
+
+            var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(auth);
+
         } catch (Exception e) {
             System.out.println("JWT Parsing Error: " + e.getMessage());
             SecurityContextHolder.clearContext();

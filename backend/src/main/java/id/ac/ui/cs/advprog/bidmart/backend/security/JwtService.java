@@ -5,6 +5,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
+import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
@@ -24,8 +25,8 @@ public class JwtService {
         Instant exp = now.plusMillis(props.getAccessTokenExpiration());
 
         return Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("email", email)
+                .subject(String.valueOf(userId))   // store userId in subject
+                .claim("email", email)            // store email as claim
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(key)
@@ -34,7 +35,7 @@ public class JwtService {
 
     public Claims parseClaims(String token) {
         return Jwts.parser()
-                .verifyWith((javax.crypto.SecretKey) key)
+                .verifyWith((SecretKey) key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
