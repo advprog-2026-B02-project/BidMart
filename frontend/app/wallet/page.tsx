@@ -1,16 +1,11 @@
 "use client";
 
 import {useCallback, useEffect, useMemo, useState} from "react";
+import Link from "next/link";
+import {me} from "@/lib/api";
 
 const BACKEND_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8080";
-const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
-const DEMO_AUCTION_ID = "22222222-2222-2222-2222-222222222222"; 
-
-const randomId = () =>
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 type WalletResponse = {
     userId: string;
@@ -38,13 +33,20 @@ const parseError = (error: unknown) => {
     return "Unexpected error";
 };
 
-const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-    const headers = init?.body
-        ? {
-              "Content-Type": "application/json",
-              ...(init.headers ?? {}),
-          }
-        : init?.headers;
+const authRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+    const token =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+
+    const headers: Record<string, string> = {
+        ...(init?.headers as Record<string, string> | undefined),
+    };
+
+    if (init?.body && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+    }
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
 
     const response = await fetch(`${BACKEND_URL}${path}`, {
         cache: "no-store",
@@ -52,14 +54,21 @@ const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
         headers,
     });
     if (!response.ok) {
-        const message = await response.text();
+        const message = await response.text().catch(() => "");
         throw new Error(message || response.statusText);
     }
     return (await response.json()) as T;
 };
 
+interface SessionInfo {
+    userId: string;
+    email: string;
+}
+
 export default function WalletPage() {
-    const [views, setViews] = useState(0);
+    const [session, setSession] = useState<SessionInfo | null>(null);
+    const [sessionMsg, setSessionMsg] = useState<string>("Checking session...");
+
     const [wallet, setWallet] = useState<WalletResponse | null>(null);
     const [activeHold, setActiveHold] = useState<HoldResponse | null>(null);
     const [topUpInput, setTopUpInput] = useState("100000");
@@ -70,11 +79,23 @@ export default function WalletPage() {
     const [acting, setActing] = useState(false);
 
     useEffect(() => {
-        fetch(`${BACKEND_URL}/api/counter`)
-            .then((res) => res.json())
-            .then((data) => setViews(data))
-            .catch(() => {
-            });
+        (async () => {
+            try {
+                const data = await me();
+                const info = {
+                    userId: String(data?.userId ?? ""),
+                    email: data?.email ?? "user",
+                };
+                setSession(info);
+                setSessionMsg(`Logged in as ${info.email}`);
+            } catch (error) {
+                setSession(null);
+                setSessionMsg(
+                    parseError(error) ||
+                    "You need to login first to use the wallet simulator.",
+                );
+            }
+        })();
     }, []);
 
     const formatAmount = useMemo(
@@ -88,11 +109,12 @@ export default function WalletPage() {
     );
 
     const syncWallet = useCallback(async () => {
+        if (!session) {
+            return;
+        }
         setSyncing(true);
         try {
-            const data = await request<WalletResponse>(
-                `/api/wallets/${DEMO_USER_ID}`,
-            );
+            const data = await authRequest<WalletResponse>("/api/wallets/me");
             setWallet(data);
             setStatus("Wallet synced with backend.");
         } catch (error) {
@@ -100,14 +122,20 @@ export default function WalletPage() {
         } finally {
             setSyncing(false);
         }
-    }, []);
+    }, [session]);
 
     useEffect(() => {
-        syncWallet();
-    }, [syncWallet]);
+        if (session) {
+            syncWallet();
+        }
+    }, [session, syncWallet]);
 
     const runAction = useCallback(
         async (message: string, action: () => Promise<unknown>) => {
+            if (!session) {
+                setStatus("Please login first.");
+                return;
+            }
             setActing(true);
             try {
                 await action();
@@ -119,7 +147,7 @@ export default function WalletPage() {
                 setActing(false);
             }
         },
-        [syncWallet],
+        [session, syncWallet],
     );
 
     const handleTopUp = () => {
@@ -129,7 +157,7 @@ export default function WalletPage() {
             return;
         }
         runAction(`Top up successful (+${formatAmount.format(amount)}).`, () =>
-            request(`/api/wallets/${DEMO_USER_ID}/top-up`, {
+            authRequest<WalletResponse>("/api/wallets/me/top-up", {
                 method: "POST",
                 body: JSON.stringify({amount}),
             }),
@@ -142,14 +170,11 @@ export default function WalletPage() {
             return;
         }
         runAction(label, async () => {
-            const response = await request<HoldResponse>(
-                `/api/wallets/${DEMO_USER_ID}/holds`,
+            const response = await authRequest<HoldResponse>(
+                "/api/wallets/me/holds",
                 {
                     method: "POST",
                     body: JSON.stringify({
-                        userId: DEMO_USER_ID,
-                        auctionId: DEMO_AUCTION_ID,
-                        bidId: randomId(),
                         amount,
                     }),
                 },
@@ -164,12 +189,21 @@ export default function WalletPage() {
             return;
         }
         runAction("Hold released.", async () => {
-            await request<HoldResponse>(
+            await authRequest<HoldResponse>(
                 `/api/wallets/holds/${activeHold.holdId}/release`,
                 {
                     method: "POST",
                 },
             );
+            setActiveHold(null);
+        });
+    };
+
+    const handleReset = () => {
+        runAction("Wallet reset to zero.", async () => {
+            await authRequest<WalletResponse>("/api/wallets/me/reset", {
+                method: "POST",
+            });
             setActiveHold(null);
         });
     };
@@ -186,18 +220,15 @@ export default function WalletPage() {
         }
         const newAmount = activeHold.amount + increment;
         runAction(`Bid raised to ${formatAmount.format(newAmount)}.`, async () => {
-            await request<HoldResponse>(
+            await authRequest<HoldResponse>(
                 `/api/wallets/holds/${activeHold.holdId}/release`,
                 {method: "POST"},
             );
-            const response = await request<HoldResponse>(
-                `/api/wallets/${DEMO_USER_ID}/holds`,
+            const response = await authRequest<HoldResponse>(
+                "/api/wallets/me/holds",
                 {
                     method: "POST",
                     body: JSON.stringify({
-                        userId: DEMO_USER_ID,
-                        auctionId: DEMO_AUCTION_ID,
-                        bidId: randomId(),
                         amount: newAmount,
                     }),
                 },
@@ -206,27 +237,22 @@ export default function WalletPage() {
         });
     };
 
-    const handleReset = () => {
-        runAction("Wallet reset to zero.", async () => {
-            await request(`/api/wallets/${DEMO_USER_ID}/reset`, {
-                method: "POST",
-            });
-            setActiveHold(null);
-        });
-    };
-
-    const isBusy = syncing || acting;
+    const actionsDisabled = !session || syncing || acting;
 
     return (
         <main className="min-h-screen bg-[#F1E9D9] text-[#003060]">
             <section className="bg-gradient-to-r from-[#003060] to-[#00162D] py-10 text-center text-[#F1E9D9] shadow-md">
                 <p className="text-sm uppercase tracking-[0.5em] opacity-80">
-                    BidMart internal metrics
+                    BidMart wallet simulator
                 </p>
-                <p className="mt-2 text-4xl font-mono font-semibold">
-                    Views: <span>{views}</span>
-                </p>
-                <p className="text-xs opacity-70">Demo user: {DEMO_USER_ID}</p>
+                <p className="mt-2 text-xl">{sessionMsg}</p>
+                {!session && (
+                    <p className="text-sm mt-2">
+                        <Link className="underline" href="/login">
+                            Login disini
+                        </Link>
+                    </p>
+                )}
             </section>
 
             <section className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -235,10 +261,14 @@ export default function WalletPage() {
                         <h1 className="text-3xl font-bold">
                             Wallet Backend Integrated Simulator
                         </h1>
+                        <p className="text-[#003060]/80">
+                            Semua aksi di bawah menggunakan akun Anda saat ini.
+                        </p>
                     </div>
                     <button
-                        onClick={syncWallet}
+                        onClick={() => syncWallet()}
                         className="rounded-lg border border-[#003060] px-4 py-2 text-sm font-semibold transition hover:bg-[#003060] hover:text-[#F1E9D9]"
+                        disabled={!session || syncing}
                     >
                         Refresh balances
                     </button>
@@ -268,9 +298,7 @@ export default function WalletPage() {
                                 <p className="text-sm opacity-80">Last Updated</p>
                                 <p className="text-xl">
                                     {wallet?.updatedAt
-                                        ? new Date(wallet.updatedAt).toLocaleString(
-                                              "id-ID",
-                                          )
+                                        ? new Date(wallet.updatedAt).toLocaleString("id-ID")
                                         : "—"}
                                 </p>
                             </div>
@@ -291,15 +319,15 @@ export default function WalletPage() {
                             <div className="flex flex-wrap gap-3">
                                 <button
                                     className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
-                                    onClick={syncWallet}
-                                    disabled={isBusy}
+                                    onClick={() => syncWallet()}
+                                    disabled={actionsDisabled}
                                 >
                                     Create Wallet
                                 </button>
                                 <button
                                     className="rounded-lg border border-[#003060] px-4 py-2 font-semibold transition hover:bg-[#003060] hover:text-[#F1E9D9] disabled:opacity-60"
                                     onClick={handleReset}
-                                    disabled={isBusy}
+                                    disabled={actionsDisabled}
                                 >
                                     Recreate Wallet
                                 </button>
@@ -315,12 +343,12 @@ export default function WalletPage() {
                                         className="flex-1 rounded-lg border border-[#003060]/40 bg-[#F1E9D9] px-3 py-2 text-[#003060] focus:border-[#003060] focus:outline-none"
                                         value={topUpInput}
                                         onChange={(e) => setTopUpInput(e.target.value)}
-                                        disabled={isBusy}
+                                        disabled={actionsDisabled}
                                     />
                                     <button
                                         className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
                                         onClick={handleTopUp}
-                                        disabled={isBusy}
+                                        disabled={actionsDisabled}
                                     >
                                         Top Up Wallet
                                     </button>
@@ -337,7 +365,7 @@ export default function WalletPage() {
                                         className="flex-1 rounded-lg border border-[#003060]/40 bg-[#F1E9D9] px-3 py-2 text-[#003060] focus:border-[#003060] focus:outline-none"
                                         value={bidInput}
                                         onChange={(e) => setBidInput(e.target.value)}
-                                        disabled={isBusy}
+                                        disabled={actionsDisabled}
                                     />
                                     <button
                                         className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
@@ -347,7 +375,7 @@ export default function WalletPage() {
                                                 "Bid placed via hold.",
                                             )
                                         }
-                                        disabled={isBusy}
+                                        disabled={actionsDisabled}
                                     >
                                         Bid at Price
                                     </button>
@@ -364,12 +392,12 @@ export default function WalletPage() {
                                         className="flex-1 rounded-lg border border-[#003060]/40 bg-[#F1E9D9] px-3 py-2 text-[#003060] focus:border-[#003060] focus:outline-none"
                                         value={raiseInput}
                                         onChange={(e) => setRaiseInput(e.target.value)}
-                                        disabled={isBusy}
+                                        disabled={actionsDisabled}
                                     />
                                     <button
                                         className="rounded-lg bg-gradient-to-r from-[#003060] to-[#00162D] px-4 py-2 font-semibold text-[#F1E9D9] transition hover:opacity-90 disabled:opacity-60"
                                         onClick={handleRaiseBid}
-                                        disabled={isBusy}
+                                        disabled={actionsDisabled}
                                     >
                                         Raise Bid
                                     </button>
@@ -379,7 +407,7 @@ export default function WalletPage() {
                             <button
                                 className="w-full rounded-lg border border-[#003060] px-4 py-2 font-semibold transition hover:bg-[#003060] hover:text-[#F1E9D9] disabled:opacity-60"
                                 onClick={handleReleaseHold}
-                                disabled={isBusy}
+                                disabled={actionsDisabled}
                             >
                                 Release Bid
                             </button>
@@ -390,7 +418,7 @@ export default function WalletPage() {
                 <div className="mt-8 rounded-xl bg-white/80 p-4 text-sm text-[#003060] shadow">
                     <p className="font-semibold">Status</p>
                     <p>{status}</p>
-                    {isBusy && (
+                    {syncing && (
                         <p className="text-xs text-[#003060]/70">
                             Talking to backend...
                         </p>

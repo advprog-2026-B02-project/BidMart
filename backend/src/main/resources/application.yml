@@ -21,6 +21,9 @@ spring:
 server:
   port: 8080
 
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-change-in-production-please}
   access-token-expiration: 900000

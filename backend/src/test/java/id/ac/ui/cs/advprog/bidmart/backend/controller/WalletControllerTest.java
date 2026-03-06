@@ -8,6 +8,7 @@ import id.ac.ui.cs.advprog.bidmart.wallet.dto.HoldResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.TopUpRequest;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.WalletResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.service.WalletService;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,12 +45,31 @@ class WalletControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final UUID userId = UUID.randomUUID();
+    private final String principalSubject = "42";
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(walletController)
                 .setControllerAdvice(new WalletExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void getWalletForCurrentUserShouldUsePrincipal() throws Exception {
+        UUID derivedId = derivedUuid(principalSubject);
+        WalletResponse response = WalletResponse.builder()
+                .userId(derivedId)
+                .availableBalance(900_000L)
+                .heldBalance(0L)
+                .build();
+        when(walletService.getWallet(derivedId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/wallets/me").principal(() -> principalSubject))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableBalance").value(900_000L));
+
+        verify(walletService).getWallet(derivedId);
+        verifyNoMoreInteractions(walletService);
     }
 
     @Test
@@ -93,6 +113,28 @@ class WalletControllerTest {
     }
 
     @Test
+    void topUpForCurrentUserShouldForwardToService() throws Exception {
+        UUID derivedId = derivedUuid(principalSubject);
+        TopUpRequest request = TopUpRequest.builder().amount(50_000L).build();
+        WalletResponse response = WalletResponse.builder()
+                .userId(derivedId)
+                .availableBalance(50_000L)
+                .heldBalance(0L)
+                .build();
+        when(walletService.topUp(any(), any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/wallets/me/top-up")
+                        .principal(() -> principalSubject)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableBalance").value(50_000L));
+
+        verify(walletService).topUp(eq(derivedId), argThat(req -> req.getAmount() == 50_000L));
+        verifyNoMoreInteractions(walletService);
+    }
+
+    @Test
     void resetShouldCallServiceAndReturnWallet() throws Exception {
         WalletResponse response = WalletResponse.builder()
                 .userId(userId)
@@ -106,6 +148,24 @@ class WalletControllerTest {
                 .andExpect(jsonPath("$.availableBalance").value(0L));
 
         verify(walletService).resetWallet(userId);
+        verifyNoMoreInteractions(walletService);
+    }
+
+    @Test
+    void resetCurrentUserShouldCallService() throws Exception {
+        UUID derivedId = derivedUuid(principalSubject);
+        WalletResponse response = WalletResponse.builder()
+                .userId(derivedId)
+                .availableBalance(0L)
+                .heldBalance(0L)
+                .build();
+        when(walletService.resetWallet(derivedId)).thenReturn(response);
+
+        mockMvc.perform(post("/api/wallets/me/reset").principal(() -> principalSubject))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.heldBalance").value(0L));
+
+        verify(walletService).resetWallet(derivedId);
         verifyNoMoreInteractions(walletService);
     }
 
@@ -151,6 +211,33 @@ class WalletControllerTest {
     }
 
     @Test
+    void createHoldForCurrentUserShouldPopulateUserId() throws Exception {
+        UUID derivedId = derivedUuid(principalSubject);
+        HoldRequest request = HoldRequest.builder()
+                .auctionId(UUID.randomUUID())
+                .amount(75_000L)
+                .build();
+        HoldResponse response = HoldResponse.builder()
+                .holdId(UUID.randomUUID())
+                .userId(derivedId)
+                .amount(75_000L)
+                .status("ACTIVE")
+                .build();
+        when(walletService.createHold(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/wallets/me/holds")
+                        .principal(() -> principalSubject)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.amount").value(75_000L));
+
+        verify(walletService).createHold(argThat(req ->
+                derivedId.equals(req.getUserId()) && req.getAmount() == 75_000L));
+        verifyNoMoreInteractions(walletService);
+    }
+
+    @Test
     void releaseHoldShouldReturnOk() throws Exception {
         UUID holdId = UUID.randomUUID();
         HoldResponse response = HoldResponse.builder()
@@ -182,5 +269,9 @@ class WalletControllerTest {
 
         verify(walletService).captureHold(holdId);
         verifyNoMoreInteractions(walletService);
+    }
+
+    private UUID derivedUuid(String subject) {
+        return UUID.nameUUIDFromBytes(("wallet-user-" + subject).getBytes(StandardCharsets.UTF_8));
     }
 }

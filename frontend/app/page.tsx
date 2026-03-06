@@ -7,10 +7,11 @@ export default function Home() {
     const [views, setViews] = useState(0);
 
     useEffect(() => {
-        fetch("http://localhost:8080/api/counter")  // skrng local host dlu
+        fetch("http://localhost:8080/api/counter")
             .then((res) => res.json())
             .then((data) => setViews(data))
             .catch(() => {
+                // ignore failures silently for now
             });
     }, []);
 
