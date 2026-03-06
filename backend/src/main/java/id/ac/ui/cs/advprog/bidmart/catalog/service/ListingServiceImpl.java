@@ -33,7 +33,6 @@ public class ListingServiceImpl implements ListingService {
     private final ListingRepository  listingRepository;
     private final CategoryRepository categoryRepository;
 
-    // ── Create ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -61,7 +60,6 @@ public class ListingServiceImpl implements ListingService {
         return ListingResponse.from(listingRepository.save(listing));
     }
 
-    // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
@@ -92,7 +90,6 @@ public class ListingServiceImpl implements ListingService {
                 .map(ListingSummaryResponse::from);
     }
 
-    // ── Update ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -102,11 +99,11 @@ public class ListingServiceImpl implements ListingService {
 
         if (listing.getStatus() == ListingStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Listing yang sudah CLOSED tidak dapat diubah.");
+                    "Closed Listing cannot be changed.");
         }
         if (listing.getStatus() == ListingStatus.ACTIVE && listing.getBidCount() > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Listing tidak dapat diubah setelah ada penawaran masuk.");
+                    "Listing cannot be changed because of existing bid.");
         }
 
         if (request.getCategoryId()       != null) {
@@ -123,7 +120,6 @@ public class ListingServiceImpl implements ListingService {
         return ListingResponse.from(listingRepository.save(listing));
     }
 
-    // ── Activate (DRAFT → ACTIVE) ─────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -133,7 +129,7 @@ public class ListingServiceImpl implements ListingService {
 
         if (listing.getStatus() != ListingStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Transisi status tidak valid: " + listing.getStatus() + " → ACTIVE");
+                    "Update Listing status invalid.");
         }
 
         listing.setStatus(ListingStatus.ACTIVE);
@@ -143,7 +139,6 @@ public class ListingServiceImpl implements ListingService {
         return ListingResponse.from(listingRepository.save(listing));
     }
 
-    // ── Cancel ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -153,18 +148,17 @@ public class ListingServiceImpl implements ListingService {
 
         if (listing.getBidCount() > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Listing tidak dapat dibatalkan setelah ada penawaran masuk.");
+                    "Listing cannot be canceled because of an existing bid.");
         }
         if (listing.getStatus() == ListingStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Listing sudah berstatus CLOSED.");
+                    "Listing is already closed.");
         }
 
         listing.setStatus(ListingStatus.CLOSED);
         listingRepository.save(listing);
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -174,13 +168,12 @@ public class ListingServiceImpl implements ListingService {
 
         if (listing.getStatus() != ListingStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Hanya listing DRAFT yang dapat dihapus.");
+                    "Non-DRAFT Listing cannot be deleted.");
         }
 
         listingRepository.delete(listing);
     }
 
-    // ── Admin ─────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
@@ -198,7 +191,7 @@ public class ListingServiceImpl implements ListingService {
             case APPROVE -> {
                 if (listing.getStatus() != ListingStatus.DRAFT) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Hanya listing DRAFT yang dapat disetujui.");
+                            "Only Draft Listing can be approved.");
                 }
                 listing.setStatus(ListingStatus.ACTIVE);
                 listing.setActivatedAt(Instant.now());
@@ -207,7 +200,7 @@ public class ListingServiceImpl implements ListingService {
             case REJECT, DELETE -> {
                 if (listing.getStatus() == ListingStatus.CLOSED) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Listing sudah berstatus CLOSED.");
+                            "Listing is already closed.");
                 }
                 listing.setStatus(ListingStatus.CLOSED);
             }
@@ -216,7 +209,6 @@ public class ListingServiceImpl implements ListingService {
         return ListingResponse.from(listingRepository.save(listing));
     }
 
-    // ── [LOGIC] Validasi listing untuk penawaran ──────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
@@ -225,15 +217,14 @@ public class ListingServiceImpl implements ListingService {
 
         if (listing.getStatus() != ListingStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Listing tidak aktif. Status saat ini: " + listing.getStatus());
+                    "Listing is not active.");
         }
         if (!listing.isAuctionOngoing()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Waktu lelang sudah berakhir pada: " + listing.getAuctionEndTime());
+                    "Auction time is already oover.");
         }
     }
 
-    // ── [LOGIC] Sinkronisasi harga dari bid service ───────────────────────────
 
     @Override
     @Transactional
@@ -241,29 +232,28 @@ public class ListingServiceImpl implements ListingService {
         int updated = listingRepository.syncPrice(listingId, newPrice, bidCount);
         if (updated == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Listing tidak ditemukan: " + listingId);
+                    "Listing not found.");
         }
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
 
     private Listing getOrThrow(UUID id) {
         return listingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Listing tidak ditemukan: " + id));
+                        HttpStatus.NOT_FOUND, "Listing not found.");
     }
 
     private void assertOwner(Listing listing, UUID sellerId) {
         if (!listing.getSellerId().equals(sellerId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Anda bukan pemilik listing ini.");
+                    "User does not own this listing.");
         }
     }
 
     private void validateCategoryExists(UUID categoryId) {
         if (!categoryRepository.existsById(categoryId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Category tidak ditemukan: " + categoryId);
+                    "Category not found.");
         }
     }
 
