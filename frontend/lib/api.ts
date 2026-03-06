@@ -21,6 +21,12 @@ async function parseError(res: Response | null) {
         if (rawMsg.includes("expired") || rawMsg.includes("Invalid token")) {
             return "Link verifikasi sudah kadaluarsa. Silakan daftar ulang atau minta link baru.";
         }
+        if (rawMsg.includes("expired") || rawMsg.includes("Invalid token")) {
+            return "Link verifikasi sudah kadaluarsa. Silakan daftar ulang atau minta link baru.";
+        }
+        if (rawMsg.includes("already used")) {
+            return "Akun anda sudah terdaftar. Silakan masuk ke akun Anda.";
+        }
 
         return rawMsg || `Terjadi kesalahan (Kode: ${res.status})`;
     } catch {
@@ -150,6 +156,27 @@ export async function me() {
         }
 
         return await res.json();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function verifyEmail(token: string) {
+    try {
+        const res = await fetch(`${BASE_URL}/auth/verify?token=${token}`, {
+            method: "GET",
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return await res.text();
     } catch (err: any) {
         if (!(err instanceof Error) || err.message === "Failed to fetch") {
             const cleanMsg = await parseError(null);
