@@ -86,12 +86,12 @@ export async function logout() {
     localStorage.removeItem("refreshToken");
 }
 
-export async function register(email: string, password: string) {
+export async function register(email: string, password: string, displayName: string) {
     try {
         const res = await fetch(`${BASE_URL}/auth/register`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({email, password}),
+            body: JSON.stringify({email, password, displayName}),
         });
 
         if (!res.ok) {
@@ -252,6 +252,38 @@ export async function validateResetToken(token: string) {
         }
 
         return true;
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function updateProfile(displayName: string, avatarUrl: string) {
+    try {
+        const token = getAccessToken();
+
+        if (!token) {
+            throw new Error("Sesi tidak ditemukan, silakan login ulang.");
+        }
+
+        const res = await fetch(`${BASE_URL}/me`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({displayName, avatarUrl}),
+        });
+
+        if (!res.ok) {
+            const msg = await parseError(res);
+            throw new Error(msg);
+        }
+
+        return await res.json();
     } catch (err: any) {
         if (!(err instanceof Error) || err.message === "Failed to fetch") {
             const cleanMsg = await parseError(null);

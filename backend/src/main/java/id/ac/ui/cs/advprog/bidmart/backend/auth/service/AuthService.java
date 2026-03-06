@@ -54,7 +54,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void register(String email, String rawPassword) {
+    public void register(String email, String rawPassword, String displayName) {
         String normalized = email.toLowerCase().trim();
 
         Optional<User> existingUser = users.findByEmail(normalized);
@@ -66,6 +66,7 @@ public class AuthService {
             }
 
             u.setPasswordHash(passwordEncoder.encode(rawPassword));
+            u.setDisplayName(displayName);
             users.save(u);
 
             sendVerificationProcedure(u);
@@ -75,6 +76,7 @@ public class AuthService {
         User u = new User();
         u.setEmail(normalized);
         u.setPasswordHash(passwordEncoder.encode(rawPassword));
+        u.setDisplayName(displayName);
         u.setEmailVerified(false);
         users.save(u);
 
