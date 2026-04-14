@@ -196,6 +196,41 @@ class ListingServiceTest {
     }
 
     @Test
+    void testUpdate_PartialFields() {
+        UpdateListingRequest req = UpdateListingRequest.builder()
+                .title("New Title Only")
+                .build();
+
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenReturn(listing);
+
+        listingService.update(listingId, sellerId, req);
+        assertEquals("New Title Only", listing.getTitle());
+        assertEquals(categoryId, listing.getCategoryId()); // Unchanged
+    }
+
+    @Test
+    void testUpdate_NullFields() {
+        UpdateListingRequest req = new UpdateListingRequest(); // All null
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenReturn(listing);
+
+        listingService.update(listingId, sellerId, req);
+        assertNotNull(listing.getTitle()); // Should not have changed to null
+    }
+
+    @Test
+    void testUpdate_ActiveWithoutBids() {
+        listing.setStatus(ListingStatus.ACTIVE);
+        listing.setBidCount(0);
+        UpdateListingRequest req = UpdateListingRequest.builder().title("New").build();
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenReturn(listing);
+
+        assertDoesNotThrow(() -> listingService.update(listingId, sellerId, req));
+    }
+
+    @Test
     void testUpdate_NotOwner() {
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
         assertThrows(ResponseStatusException.class, () -> listingService.update(listingId, UUID.randomUUID(), new UpdateListingRequest()));
@@ -301,6 +336,17 @@ class ListingServiceTest {
     void testModerate_Reject() {
         ModerateListingRequest req = new ModerateListingRequest();
         req.setAction(Action.REJECT);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any())).thenReturn(listing);
+
+        listingService.moderate(listingId, req);
+        assertEquals(ListingStatus.CLOSED, listing.getStatus());
+    }
+
+    @Test
+    void testModerate_Delete() {
+        ModerateListingRequest req = new ModerateListingRequest();
+        req.setAction(Action.DELETE);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
         when(listingRepository.save(any())).thenReturn(listing);
 

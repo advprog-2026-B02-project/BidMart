@@ -157,6 +157,21 @@ class AuthServiceTest {
     }
 
     @Test
+    void verifyEmail_Expired() {
+        EmailVerificationToken t = new EmailVerificationToken();
+        t.setExpiresAt(Instant.now().minusSeconds(100));
+        when(verificationTokens.findByToken("token")).thenReturn(Optional.of(t));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("token"));
+    }
+
+    @Test
+    void verifyEmail_InvalidToken() {
+        when(verificationTokens.findByToken("invalid")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("invalid"));
+    }
+
+    @Test
     void refresh_Success() {
         RefreshToken rt = new RefreshToken();
         rt.setUser(user);
@@ -179,6 +194,22 @@ class AuthServiceTest {
     }
 
     @Test
+    void refresh_Expired() {
+        RefreshToken rt = new RefreshToken();
+        rt.setExpiresAt(Instant.now().minusSeconds(100));
+        rt.setRevoked(false);
+        when(refreshTokens.findByToken("oldrefresh")).thenReturn(Optional.of(rt));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.refresh("oldrefresh"));
+    }
+
+    @Test
+    void refresh_InvalidToken() {
+        when(refreshTokens.findByToken("invalid")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> authService.refresh("invalid"));
+    }
+
+    @Test
     void logout_Success() {
         RefreshToken rt = new RefreshToken();
         when(refreshTokens.findByToken("token")).thenReturn(Optional.of(rt));
@@ -190,6 +221,12 @@ class AuthServiceTest {
     }
 
     @Test
+    void logout_InvalidToken() {
+        when(refreshTokens.findByToken("invalid")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> authService.logout("invalid"));
+    }
+
+    @Test
     void forgotPassword_Success() {
         when(users.findByEmail("test@example.com")).thenReturn(Optional.of(user));
 
@@ -198,6 +235,12 @@ class AuthServiceTest {
         verify(resetTokens).deleteByUserAndUsedAtIsNull(user);
         verify(resetTokens).save(any(PasswordResetToken.class));
         verify(emailService).sendResetPasswordEmail(eq("test@example.com"), anyString());
+    }
+
+    @Test
+    void forgotPassword_UserNotFound() {
+        when(users.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> authService.forgotPassword("notfound@example.com"));
     }
 
     @Test
@@ -213,5 +256,57 @@ class AuthServiceTest {
         assertNotNull(t.getUsedAt());
         verify(users).save(user);
         verify(resetTokens).save(t);
+    }
+
+    @Test
+    void resetPassword_InvalidToken() {
+        when(resetTokens.findByToken("invalid")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> authService.resetPassword("invalid", "p"));
+    }
+
+    @Test
+    void resetPassword_AlreadyUsed() {
+        PasswordResetToken t = new PasswordResetToken();
+        t.setUsedAt(Instant.now());
+        when(resetTokens.findByToken("token")).thenReturn(Optional.of(t));
+        assertThrows(IllegalArgumentException.class, () -> authService.resetPassword("token", "p"));
+    }
+
+    @Test
+    void resetPassword_Expired() {
+        PasswordResetToken t = new PasswordResetToken();
+        t.setExpiresAt(Instant.now().minusSeconds(100));
+        when(resetTokens.findByToken("token")).thenReturn(Optional.of(t));
+        assertThrows(IllegalArgumentException.class, () -> authService.resetPassword("token", "p"));
+    }
+
+    @Test
+    void validateResetToken_Success() {
+        PasswordResetToken t = new PasswordResetToken();
+        t.setExpiresAt(Instant.now().plusSeconds(100));
+        when(resetTokens.findByToken("token")).thenReturn(Optional.of(t));
+        assertDoesNotThrow(() -> authService.validateResetToken("token"));
+    }
+
+    @Test
+    void validateResetToken_InvalidToken() {
+        when(resetTokens.findByToken("invalid")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> authService.validateResetToken("invalid"));
+    }
+
+    @Test
+    void validateResetToken_AlreadyUsed() {
+        PasswordResetToken t = new PasswordResetToken();
+        t.setUsedAt(Instant.now());
+        when(resetTokens.findByToken("token")).thenReturn(Optional.of(t));
+        assertThrows(IllegalArgumentException.class, () -> authService.validateResetToken("token"));
+    }
+
+    @Test
+    void validateResetToken_Expired() {
+        PasswordResetToken t = new PasswordResetToken();
+        t.setExpiresAt(Instant.now().minusSeconds(100));
+        when(resetTokens.findByToken("token")).thenReturn(Optional.of(t));
+        assertThrows(IllegalArgumentException.class, () -> authService.validateResetToken("token"));
     }
 }
