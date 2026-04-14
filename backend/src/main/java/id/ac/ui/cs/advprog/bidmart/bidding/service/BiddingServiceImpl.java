@@ -136,8 +136,9 @@ public class BiddingServiceImpl implements BiddingService {
         auction.setEndTime(request.getEndTime());
         auction.setOriginalEndTime(request.getEndTime());
 
-        // catatan: reserve price idealnya disimpan di entity auction atau ditarik dari catalog
-        auction.setReserveMet(false);
+        // cek dinamis apakah start price sudah memenuhi reserve price
+        boolean isReserveMet = request.getStartPrice().compareTo(request.getReservePrice()) >= 0;
+        auction.setReserveMet(isReserveMet);
 
         auction = auctionRepository.save(auction);
         return mapToAuctionResponse(auction);
