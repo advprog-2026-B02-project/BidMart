@@ -23,6 +23,14 @@ public class User {
     private String passwordHash;
 
     @Setter
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+
+    @Setter
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Setter
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified = false;
 
@@ -43,6 +51,9 @@ public class User {
     public void setEmail(String email) { this.email = email.toLowerCase().trim(); }
 
     public String getPasswordHash() { return passwordHash; }
+
+    public String getDisplayName() { return displayName; }
+    public String getAvatarUrl() { return avatarUrl; }
 
     public boolean isEmailVerified() { return emailVerified; }
 

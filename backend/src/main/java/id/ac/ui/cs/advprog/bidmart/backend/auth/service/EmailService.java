@@ -21,4 +21,13 @@ public class EmailService {
 
         mailSender.send(message);
     }
+
+    public void sendResetPasswordEmail(String to, String link) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("Reset Your BidMart Password");
+        message.setText("You requested a password reset. Click the link below to set a new password:\n\n" +
+                link + "\n\nIf you didn't request this, please ignore this email.");
+        mailSender.send(message);
+    }
 }

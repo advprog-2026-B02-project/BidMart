@@ -5,11 +5,15 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public class RegisterRequest {
-    @Email
-    @NotBlank
+    @NotBlank(message = "Email tidak boleh kosong")
+    @Email(message = "Format email tidak valid")
     public String email;
 
-    @NotBlank
-    @Size(min = 8, max = 72)
+    @NotBlank(message = "Password tidak boleh kosong")
+    @Size(min = 8, max = 50, message = "Password minimal 8 karakter dan maximal 50 karakter")
     public String password;
+
+    @NotBlank(message = "Nama tampilan tidak boleh kosong")
+    @Size(max = 100, message = "Nama tampilan maksimal 100 karakter")
+    public String displayName;
 }

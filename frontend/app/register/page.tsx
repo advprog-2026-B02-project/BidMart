@@ -1,99 +1,120 @@
 "use client";
 
 import {useState} from "react";
-import Link from "next/link";
+import {useRouter} from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import {buttonCls, inputCls} from "@/components/ui";
-import {register as apiRegister} from "@/lib/api";
+import {register} from "@/lib/api";
 
 export default function RegisterPage() {
+    const router = useRouter();
+
+    const [displayName, setDisplayName] = useState("");
     const [email, setEmail] = useState("");
-    const [pass, setPass] = useState("");
-    const [pass2, setPass2] = useState("");
+    const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
+    const [isSuccess, setIsSuccess] = useState(false);
 
     async function onSubmit(e: React.FormEvent) {
         e.preventDefault();
         setMsg(null);
-
-        if (pass !== pass2) {
-            setMsg("Konfirmasi kata sandi tidak sama.");
-            return;
-        }
-
         setLoading(true);
+
         try {
-            await apiRegister(email, pass);
-            setMsg("Link verifikasi baru telah dikirim! Silahkan cek email Anda.");
-            // JANGAN DIPINDAHIN ke /login PLEASE, user gabisa baca messagenya
+            await register(email, password, displayName);
+            setIsSuccess(true);
+            setMsg("Registrasi berhasil! Silakan cek email Anda untuk verifikasi.");
         } catch (err: unknown) {
-            setMsg(err instanceof Error ? err.message : "Gagal mendaftarkan akun.");
+            const message =
+                err instanceof Error ? err.message : "Gagal mendaftarkan akun.";
+            setMsg(message);
         } finally {
             setLoading(false);
         }
     }
 
     return (
-        <AuthShell title="Daftar Akun" subtitle="Buat akun BidMart Anda sekarang!">
-            <form onSubmit={onSubmit} className="space-y-6">
-                <div>
-                    <label className="block text-lg font-medium mb-2">Email</label>
-                    <input
-                        className={inputCls}
-                        placeholder="Masukkan email Anda"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        type="email"
-                        required
-                    />
-                </div>
+        <AuthShell title="Buat Akun Baru" subtitle="Bergabunglah dengan BidMart sekarang.">
+            {!isSuccess ? (
+                <form onSubmit={onSubmit} className="space-y-6 animate-in fade-in duration-300">
 
-                <div>
-                    <label className="block text-lg font-medium mb-2">Kata Sandi</label>
-                    <input
-                        className={inputCls}
-                        placeholder="Masukkan kata sandi Anda"
-                        value={pass}
-                        onChange={(e) => setPass(e.target.value)}
-                        type="password"
-                        required
-                        minLength={8}
-                    />
-                </div>
+                    {/* INPUT NAMA TAMPILAN */}
+                    <div>
+                        <label className="block text-lg font-medium mb-2 text-[#002447]">Nama Tampilan</label>
+                        <input
+                            className={inputCls}
+                            type="text"
+                            placeholder="Masukkan nama Anda (mis: John Doe)"
+                            value={displayName}
+                            onChange={(e) => setDisplayName(e.target.value)}
+                            required
+                            maxLength={100}
+                            disabled={loading}
+                        />
+                    </div>
 
-                <div>
-                    <label className="block text-lg font-medium mb-2">
-                        Konfirmasi Kata Sandi
-                    </label>
-                    <input
-                        className={inputCls}
-                        placeholder="Konfirmasi kata sandi Anda"
-                        value={pass2}
-                        onChange={(e) => setPass2(e.target.value)}
-                        type="password"
-                        required
-                        minLength={8}
-                    />
-                </div>
+                    {/* INPUT EMAIL */}
+                    <div>
+                        <label className="block text-lg font-medium mb-2 text-[#002447]">Email</label>
+                        <input
+                            className={inputCls}
+                            type="email"
+                            placeholder="Masukkan email aktif"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            disabled={loading}
+                        />
+                    </div>
 
-                <button disabled={loading} className={buttonCls}>
-                    {loading ? "Memproses..." : "Daftar"}
-                </button>
+                    {/* INPUT PASSWORD */}
+                    <div>
+                        <label className="block text-lg font-medium mb-2 text-[#002447]">Kata Sandi</label>
+                        <input
+                            className={inputCls}
+                            type="password"
+                            placeholder="Minimal 8 karakter"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            disabled={loading}
+                        />
+                    </div>
 
-                {msg && (
-                    <div className="rounded-xl bg-black/5 px-4 py-3 text-sm text-black/70">
+                    <button disabled={loading} className={buttonCls}>
+                        {loading ? "Mendaftar..." : "Daftar Sekarang"}
+                    </button>
+
+                    {msg && (
+                        <div className="rounded-xl bg-red-50 text-red-600 border border-red-100 px-4 py-3 text-sm">
+                            {msg}
+                        </div>
+                    )}
+
+                    <div className="mt-4 text-center">
+                        <span className="text-sm text-black/60">Sudah punya akun? </span>
+                        <button
+                            type="button"
+                            onClick={() => router.push("/login")}
+                            className="text-sm text-[#002447] font-medium hover:underline underline-offset-4"
+                        >
+                            Masuk di sini
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                <div className="space-y-6 animate-in fade-in zoom-in duration-300 text-center">
+                    <div
+                        className="rounded-xl bg-green-50 text-green-700 border border-green-100 px-4 py-4 text-sm font-medium leading-relaxed">
                         {msg}
                     </div>
-                )}
-
-                <div className="pt-6 border-t text-center text-base">
-                    Sudah punya akun?{" "}
-                    <Link className="text-sky-600 underline" href="/login">
-                        Masuk disini!
-                    </Link>
+                    <button onClick={() => router.push("/login")} className={`${buttonCls} bg-[#002447] w-full`}>
+                        Menuju Halaman Login
+                    </button>
                 </div>
-            </form>
+            )}
         </AuthShell>
     );
 }

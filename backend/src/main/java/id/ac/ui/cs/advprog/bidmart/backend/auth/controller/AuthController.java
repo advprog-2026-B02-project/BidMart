@@ -22,7 +22,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Void> register(@Valid @RequestBody RegisterRequest req) {
         System.out.println("[HIT] /auth/register");
-        auth.register(req.email, req.password);
+        auth.register(req.email, req.password, req.displayName);
         return ResponseEntity.ok().build();
     }
 

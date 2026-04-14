@@ -4,6 +4,7 @@ import {useEffect, useState, Suspense} from "react";
 import {useSearchParams, useRouter} from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import {buttonCls} from "@/components/ui";
+import {verifyEmail} from "@/lib/api";
 
 function VerifyContent() {
     const searchParams = useSearchParams();
@@ -21,23 +22,17 @@ function VerifyContent() {
             return;
         }
 
+        const safeToken = token;
+
         async function doVerify() {
             try {
-                // Pastiin URL ini nembak backend (8080)
-                const res = await fetch(`http://localhost:8080/auth/verify?token=${token}`, {
-                    method: "GET",
-                });
-
-                if (res.ok) {
-                    setStatus("success");
-                } else {
-                    const data = await res.json();
-                    setStatus("error");
-                    setMsg(data.message || "Verifikasi gagal.");
-                }
-            } catch {
+                await verifyEmail(safeToken);
+                setStatus("success");
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : "Verifikasi gagal.";
                 setStatus("error");
-                setMsg("Gagal menghubungi server.");
+                setMsg(message);
             }
         }
 
@@ -48,10 +43,9 @@ function VerifyContent() {
         <div className="flex flex-col items-center justify-center space-y-8 py-4">
             {status === "loading" && (
                 <div className="flex flex-col items-center space-y-4">
-                    {/* Spinner navy biar masuk tema */}
                     <div
                         className="animate-spin h-10 w-10 border-4 border-[#002447]/20 border-t-[#002447] rounded-full"></div>
-                    <p className="text-lg text-black/60 font-medium">Memproses verifikasi Anda...</p>
+                    <p className="text-lg text-[#002447]/60 font-medium">Memproses verifikasi Anda...</p>
                 </div>
             )}
 
@@ -105,7 +99,7 @@ function VerifyContent() {
 export default function VerifyPage() {
     return (
         <AuthShell title="Aktivasi Akun" subtitle="Hanya satu langkah lagi untuk memulai.">
-            <Suspense fallback={<div className="text-center p-10">Memuat...</div>}>
+            <Suspense fallback={<div className="text-center p-10 text-[#002447]">Memuat...</div>}>
                 <VerifyContent/>
             </Suspense>
         </AuthShell>
