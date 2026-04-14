@@ -66,6 +66,11 @@ public class BiddingServiceImpl implements BiddingService {
             auction.setHighestBidderId(bidderId);
             auction.setHighestBidderHoldId(holdId);
             auction.setBidCount(auction.getBidCount() + 1);
+
+            if (requestDTO.getAmount().compareTo(auction.getReservePrice()) >= 0) {
+                auction.setReserveMet(true);
+            }
+
             auctionRepository.save(auction);
 
             // catat riwayat penawaran ke database
@@ -136,9 +141,8 @@ public class BiddingServiceImpl implements BiddingService {
         auction.setEndTime(request.getEndTime());
         auction.setOriginalEndTime(request.getEndTime());
 
-        // cek dinamis apakah start price sudah memenuhi reserve price
-        boolean isReserveMet = request.getStartPrice().compareTo(request.getReservePrice()) >= 0;
-        auction.setReserveMet(isReserveMet);
+        // harusnya pasti false karena belum ada yang ngebid
+        auction.setReserveMet(false);
 
         auction = auctionRepository.save(auction);
         return mapToAuctionResponse(auction);
