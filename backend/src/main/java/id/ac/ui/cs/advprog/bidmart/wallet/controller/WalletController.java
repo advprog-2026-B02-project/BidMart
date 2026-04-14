@@ -3,12 +3,18 @@ package id.ac.ui.cs.advprog.bidmart.wallet.controller;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.HoldRequest;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.HoldResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.TopUpRequest;
+import id.ac.ui.cs.advprog.bidmart.wallet.dto.TransactionResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.WalletResponse;
+import id.ac.ui.cs.advprog.bidmart.wallet.dto.WithdrawRequest;
+import id.ac.ui.cs.advprog.bidmart.wallet.dto.WithdrawResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.service.WalletService;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -52,6 +58,31 @@ public class WalletController {
             @Valid @RequestBody TopUpRequest request
     ) {
         return ResponseEntity.ok(walletService.topUp(resolveUserId(principal), request));
+    }
+
+    @PostMapping("/me/withdraw")
+    public ResponseEntity<WithdrawResponse> withdraw(
+            Principal principal,
+            @Valid @RequestBody WithdrawRequest request
+    ) {
+        WithdrawResponse response = walletService.withdraw(resolveUserId(principal), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/me/transactions")
+    public ResponseEntity<Page<TransactionResponse>> getTransactionHistory(
+            Principal principal,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
+    ) {
+        return ResponseEntity.ok(walletService.getTransactionHistory(resolveUserId(principal), pageable));
+    }
+
+    @GetMapping("/me/transactions/{transactionId}")
+    public ResponseEntity<TransactionResponse> getTransaction(
+            Principal principal,
+            @PathVariable UUID transactionId
+    ) {
+        return ResponseEntity.ok(walletService.getTransaction(resolveUserId(principal), transactionId));
     }
 
     @PostMapping("/{userId}/reset")

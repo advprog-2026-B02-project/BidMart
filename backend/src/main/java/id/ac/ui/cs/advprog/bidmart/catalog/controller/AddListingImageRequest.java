@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.catalog.dto;
+package id.ac.ui.cs.advprog.bidmart.catalog.controller;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
