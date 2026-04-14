@@ -8,7 +8,10 @@ import java.util.UUID;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.HoldRequest;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.HoldResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.TopUpRequest;
+import id.ac.ui.cs.advprog.bidmart.wallet.dto.TransactionResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.dto.WalletResponse;
+import id.ac.ui.cs.advprog.bidmart.wallet.dto.WithdrawRequest;
+import id.ac.ui.cs.advprog.bidmart.wallet.dto.WithdrawResponse;
 import id.ac.ui.cs.advprog.bidmart.wallet.model.BalanceHold;
 import id.ac.ui.cs.advprog.bidmart.wallet.model.HoldStatus;
 import id.ac.ui.cs.advprog.bidmart.wallet.model.TransactionType;
@@ -18,14 +21,19 @@ import id.ac.ui.cs.advprog.bidmart.wallet.repository.BalanceHoldRepository;
 import id.ac.ui.cs.advprog.bidmart.wallet.repository.WalletRepository;
 import id.ac.ui.cs.advprog.bidmart.wallet.repository.WalletTransactionRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
 public class WalletServiceImpl implements WalletService {
+
+    private static final long WITHDRAW_FEE = 5000L;
+
     private WalletRepository walletRepository;
     private BalanceHoldRepository balanceHoldRepository;
     private WalletTransactionRepository walletTransactionRepository;
-    
+
     public WalletServiceImpl(WalletRepository walletRepository,
                              BalanceHoldRepository balanceHoldRepository,
                              WalletTransactionRepository walletTransactionRepository
@@ -38,7 +46,6 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public WalletResponse getWallet(UUID userId) {
         return walletToWalletResponse(findOrCreateWallet(userId));
-
     }
 
     @Override
@@ -53,7 +60,57 @@ public class WalletServiceImpl implements WalletService {
         return walletToWalletResponse(wallet);
     }
 
-    @Transactional // sementara buat demo cara kerja wallet di fe
+    @Override
+    @Transactional
+    public WithdrawResponse withdraw(UUID userId, WithdrawRequest request) {
+        Wallet wallet = findOrCreateWallet(userId);
+
+        long total = request.getAmount() + WITHDRAW_FEE;
+        if (wallet.getAvailableBalance() < total) {
+            throw new IllegalStateException(
+                    String.format("Saldo tidak mencukupi. Tersedia: %d, Dibutuhkan: %d (termasuk biaya %d)",
+                            wallet.getAvailableBalance(), total, WITHDRAW_FEE));
+        }
+
+        wallet.setAvailableBalance(wallet.getAvailableBalance() - total);
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        WalletTransaction txn = saveTransaction(wallet, TransactionType.WITHDRAW,
+                String.format("Penarikan ke %s %s (%s)", request.getBankCode(),
+                        request.getAccountNumber(), request.getAccountName()),
+                -total, null);
+
+        return WithdrawResponse.builder()
+                .transactionId(txn.getId())
+                .amount(request.getAmount())
+                .fee(WITHDRAW_FEE)
+                .netAmount(request.getAmount() - WITHDRAW_FEE)
+                .status("PROCESSING")
+                .estimatedCompletion(LocalDateTime.now().plusDays(1))
+                .build();
+    }
+
+    @Override
+    public Page<TransactionResponse> getTransactionHistory(UUID userId, Pageable pageable) {
+        Wallet wallet = findOrCreateWallet(userId);
+        return walletTransactionRepository
+                .findByWalletIdOrderByCreatedAtDesc(wallet.getId(), pageable)
+                .map(this::toTransactionResponse);
+    }
+
+    @Override
+    public TransactionResponse getTransaction(UUID userId, UUID transactionId) {
+        Wallet wallet = findOrCreateWallet(userId);
+        WalletTransaction txn = walletTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + transactionId));
+        if (!txn.getWalletId().equals(wallet.getId())) {
+            throw new IllegalArgumentException("Transaction not found: " + transactionId);
+        }
+        return toTransactionResponse(txn);
+    }
+
+    @Transactional
     public WalletResponse resetWallet(UUID userId) {
         Wallet wallet = findOrCreateWallet(userId);
         List<BalanceHold> holds = balanceHoldRepository.findAllByWalletId(wallet.getId());
@@ -80,7 +137,7 @@ public class WalletServiceImpl implements WalletService {
                     String.format("Saldo tidak mencukupi. Tersedia: %d, Dibutuhkan: %d",
                             wallet.getAvailableBalance(), request.getAmount()));
         }
-        
+
         balanceHoldRepository.findByUserIdAndAuctionIdAndStatus(
                 request.getUserId(), request.getAuctionId(), HoldStatus.ACTIVE)
                 .ifPresent(existingHold -> releaseHoldInternal(wallet, existingHold));
@@ -149,6 +206,49 @@ public class WalletServiceImpl implements WalletService {
 
         return toHoldResponse(hold);
     }
+
+    @Override
+    @Transactional
+    public void captureWinnerHold(UUID auctionId, UUID winnerId) {
+        List<BalanceHold> activeHolds = balanceHoldRepository
+                .findByAuctionIdAndStatus(auctionId, HoldStatus.ACTIVE);
+
+        for (BalanceHold hold : activeHolds) {
+            Wallet wallet = walletRepository.findById(hold.getWalletId())
+                    .orElseThrow(() -> new IllegalStateException("Wallet not found for hold: " + hold.getId()));
+
+            if (hold.getUserId().equals(winnerId)) {
+                wallet.setHeldBalance(wallet.getHeldBalance() - hold.getAmount());
+                wallet.setUpdatedAt(LocalDateTime.now());
+                walletRepository.save(wallet);
+
+                hold.setStatus(HoldStatus.CAPTURED);
+                hold.setUpdatedAt(LocalDateTime.now());
+                balanceHoldRepository.save(hold);
+
+                saveTransaction(wallet, TransactionType.CAPTURE,
+                        "Pembayaran lelang - pemenang", -hold.getAmount(), auctionId);
+            } else {
+                releaseHoldInternal(wallet, hold);
+                walletRepository.save(wallet);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void releaseAllHoldsForAuction(UUID auctionId) {
+        List<BalanceHold> activeHolds = balanceHoldRepository
+                .findByAuctionIdAndStatus(auctionId, HoldStatus.ACTIVE);
+
+        for (BalanceHold hold : activeHolds) {
+            Wallet wallet = walletRepository.findById(hold.getWalletId())
+                    .orElseThrow(() -> new IllegalStateException("Wallet not found for hold: " + hold.getId()));
+            releaseHoldInternal(wallet, hold);
+            walletRepository.save(wallet);
+        }
+    }
+
     public Wallet findOrCreateWallet(UUID userId){
         Optional<Wallet> wallet = walletRepository.findByUserId(userId);
         if (wallet.isEmpty()){
@@ -163,7 +263,7 @@ public class WalletServiceImpl implements WalletService {
         return wallet.get();
     }
 
-     private void releaseHoldInternal(Wallet wallet, BalanceHold hold) {
+    private void releaseHoldInternal(Wallet wallet, BalanceHold hold) {
         wallet.setAvailableBalance(wallet.getAvailableBalance()+hold.getAmount());
         wallet.setHeldBalance(wallet.getHeldBalance()-hold.getAmount());
         wallet.setUpdatedAt(LocalDateTime.now());
@@ -171,9 +271,9 @@ public class WalletServiceImpl implements WalletService {
         hold.setStatus(HoldStatus.RELEASED);
         balanceHoldRepository.save(hold);
         saveTransaction(wallet, TransactionType.RELEASE, "Release hold, lost bid", hold.getAmount(), hold.getAuctionId());
-
     }
-    public void saveTransaction(Wallet wallet, TransactionType type, String description, 
+
+    public WalletTransaction saveTransaction(Wallet wallet, TransactionType type, String description,
                                 Long amount, UUID referenceId){
         WalletTransaction transaction = WalletTransaction.builder()
                 .walletId(wallet.getId())
@@ -184,8 +284,9 @@ public class WalletServiceImpl implements WalletService {
                 .referenceId(referenceId)
                 .createdAt(LocalDateTime.now())
                 .build();
-        walletTransactionRepository.save(transaction);
+        return walletTransactionRepository.save(transaction);
     }
+
     public WalletResponse walletToWalletResponse(Wallet wallet){
         WalletResponse walletResponse = new WalletResponse();
         walletResponse.setAvailableBalance(wallet.getAvailableBalance());
@@ -196,7 +297,6 @@ public class WalletServiceImpl implements WalletService {
         return walletResponse;
     }
 
-
     private HoldResponse toHoldResponse(BalanceHold hold) {
         return HoldResponse.builder()
                 .holdId(hold.getId())
@@ -204,6 +304,18 @@ public class WalletServiceImpl implements WalletService {
                 .amount(hold.getAmount())
                 .status(hold.getStatus().name())
                 .createdAt(hold.getCreatedAt())
+                .build();
+    }
+
+    private TransactionResponse toTransactionResponse(WalletTransaction txn) {
+        return TransactionResponse.builder()
+                .id(txn.getId())
+                .type(txn.getType().name())
+                .amount(txn.getAmount())
+                .description(txn.getDescription())
+                .referenceId(txn.getReferenceId())
+                .balanceAfter(txn.getBalanceAfter())
+                .createdAt(txn.getCreatedAt())
                 .build();
     }
 }
