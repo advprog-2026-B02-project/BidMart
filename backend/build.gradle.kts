@@ -3,6 +3,7 @@ plugins {
     id("org.springframework.boot") version "3.4.2"
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
+    checkstyle
 }
 
 group = "id.ac.ui.cs.advprog.bidmart"
@@ -47,6 +48,19 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 }
+
+checkstyle {
+    toolVersion = "10.12.5"
+    configFile = file("config/checkstyle/checkstyle.xml")
+    isIgnoreFailures = false
+}
+
+configurations.named("checkstyle") {
+    resolutionStrategy.capabilitiesResolution.withCapability("com.google.collections:google-collections") {
+        selectHighestVersion()
+    }
+}
+
 
 tasks.test {
     useJUnitPlatform()
