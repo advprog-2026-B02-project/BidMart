@@ -31,11 +31,11 @@ public class ListingImage {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, columnDefinition = "uuid")
+    @Column(name = "listing_id", nullable = false, columnDefinition = "uuid")
     private UUID listingId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(insertable = false, updatable = false)
+    @JoinColumn(name = "listing_id", insertable = false, updatable = false)
     private Listing listing;
 
     @Column(nullable = false, length = 2048)

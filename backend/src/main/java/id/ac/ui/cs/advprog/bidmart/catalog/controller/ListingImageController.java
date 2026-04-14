@@ -1,6 +1,6 @@
 package id.ac.ui.cs.advprog.bidmart.catalog.controller;
 
-import id.ac.ui.cs.advprog.bidmart.catalog.dto.AddListingImageRequest;
+import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingImageRequest;
 import id.ac.ui.cs.advprog.bidmart.catalog.dto.ListingImageResponse;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.Listing;
 import id.ac.ui.cs.advprog.bidmart.catalog.model.ListingImage;
@@ -34,7 +34,7 @@ public class ListingImageController {
     public ResponseEntity<ListingImageResponse> addImage(
             @PathVariable UUID listingId,
             @RequestHeader("X-Seller-Id") UUID sellerId,
-            @Valid @RequestBody AddListingImageRequest request
+            @Valid @RequestBody ListingImageRequest request
     ) {
         Listing listing = getListingOrThrow(listingId);
         assertOwner(listing, sellerId);

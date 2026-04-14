@@ -56,7 +56,7 @@ public class Listing {
     @Column(nullable = false)
     private UUID sellerId;
 
-    @Column(nullable = false)
+    @Column(name = "category_id", nullable = false)
     private UUID categoryId;
 
     @ManyToOne(fetch = FetchType.LAZY)

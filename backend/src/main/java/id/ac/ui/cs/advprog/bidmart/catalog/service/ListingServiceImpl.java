@@ -240,7 +240,7 @@ public class ListingServiceImpl implements ListingService {
     private Listing getOrThrow(UUID id) {
         return listingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Listing not found.");
+                        HttpStatus.NOT_FOUND, "Listing not found."));
     }
 
     private void assertOwner(Listing listing, UUID sellerId) {
