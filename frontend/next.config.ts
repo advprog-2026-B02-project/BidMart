@@ -1,7 +1,12 @@
-import type { NextConfig } from "next";
+import type {NextConfig} from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+    experimental: {
+        turbopack: {
+            // Force Next/Turbopack to treat this directory as the project root.
+            root: __dirname,
+        },
+    },
 };
 
 export default nextConfig;
