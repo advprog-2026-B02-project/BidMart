@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.order.model;
+package id.ac.ui.cs.advprog.bidmart.notifications.model;
 
 public enum NotificationType {
     BID_PLACED,

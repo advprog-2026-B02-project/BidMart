@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.order.dto;
+package id.ac.ui.cs.advprog.bidmart.notifications.dto;
 
 import lombok.Builder;
 import lombok.Getter;

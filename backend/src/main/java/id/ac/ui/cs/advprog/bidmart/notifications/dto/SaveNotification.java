@@ -1,6 +1,6 @@
-package id.ac.ui.cs.advprog.bidmart.order.dto;
+package id.ac.ui.cs.advprog.bidmart.notifications.dto;
 
-import id.ac.ui.cs.advprog.bidmart.order.model.NotificationType;
+import id.ac.ui.cs.advprog.bidmart.notifications.model.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;

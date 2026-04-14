@@ -1,4 +1,4 @@
-package id.ac.ui.cs.advprog.bidmart.order.model;
+package id.ac.ui.cs.advprog.bidmart.notifications.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

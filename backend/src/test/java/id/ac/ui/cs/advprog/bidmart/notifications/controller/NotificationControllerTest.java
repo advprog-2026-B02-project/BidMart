@@ -1,7 +1,7 @@
-package id.ac.ui.cs.advprog.bidmart.order.controller;
+package id.ac.ui.cs.advprog.bidmart.notifications.controller;
 
-import id.ac.ui.cs.advprog.bidmart.order.dto.NotificationListResponse;
-import id.ac.ui.cs.advprog.bidmart.order.service.NotificationService;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.NotificationListResponse;
+import id.ac.ui.cs.advprog.bidmart.notifications.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

@@ -1,7 +1,7 @@
-package id.ac.ui.cs.advprog.bidmart.order.service;
+package id.ac.ui.cs.advprog.bidmart.notifications.service;
 
-import id.ac.ui.cs.advprog.bidmart.order.dto.NotificationListResponse;
-import id.ac.ui.cs.advprog.bidmart.order.dto.SaveNotification;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.NotificationListResponse;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.SaveNotification;
 
 import java.util.UUID;
 

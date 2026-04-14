@@ -1,12 +1,12 @@
-package id.ac.ui.cs.advprog.bidmart.order.service;
+package id.ac.ui.cs.advprog.bidmart.notifications.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import id.ac.ui.cs.advprog.bidmart.order.dto.NotificationListResponse;
-import id.ac.ui.cs.advprog.bidmart.order.dto.NotificationResponse;
-import id.ac.ui.cs.advprog.bidmart.order.dto.SaveNotification;
-import id.ac.ui.cs.advprog.bidmart.order.model.Notification;
-import id.ac.ui.cs.advprog.bidmart.order.repository.NotificationRepository;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.NotificationListResponse;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.NotificationResponse;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.SaveNotification;
+import id.ac.ui.cs.advprog.bidmart.notifications.model.Notification;
+import id.ac.ui.cs.advprog.bidmart.notifications.repository.NotificationRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

@@ -1,7 +1,7 @@
-package id.ac.ui.cs.advprog.bidmart.order.controller;
+package id.ac.ui.cs.advprog.bidmart.notifications.controller;
 
-import id.ac.ui.cs.advprog.bidmart.order.dto.NotificationListResponse;
-import id.ac.ui.cs.advprog.bidmart.order.service.NotificationService;
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.NotificationListResponse;
+import id.ac.ui.cs.advprog.bidmart.notifications.service.NotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
