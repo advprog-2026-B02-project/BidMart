@@ -31,7 +31,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 || uri.equals("/auth/login")
                 || uri.equals("/auth/verify")
                 || uri.equals("/auth/refresh")
-                || uri.equals("/health");
+                || uri.equals("/health")
+                || uri.startsWith("/ws"); // menambahkan bypass filter untuk endpoint websocket
     }
 
     @Override
