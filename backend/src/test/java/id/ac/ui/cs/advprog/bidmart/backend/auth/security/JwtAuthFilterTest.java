@@ -43,6 +43,18 @@ class JwtAuthFilterTest {
         when(request.getRequestURI()).thenReturn("/auth/login");
         assertTrue(filter.shouldNotFilter(request));
 
+        when(request.getRequestURI()).thenReturn("/auth/register");
+        assertTrue(filter.shouldNotFilter(request));
+
+        when(request.getRequestURI()).thenReturn("/auth/verify");
+        assertTrue(filter.shouldNotFilter(request));
+
+        when(request.getRequestURI()).thenReturn("/auth/refresh");
+        assertTrue(filter.shouldNotFilter(request));
+
+        when(request.getRequestURI()).thenReturn("/health");
+        assertTrue(filter.shouldNotFilter(request));
+
         when(request.getRequestURI()).thenReturn("/api/orders");
         assertFalse(filter.shouldNotFilter(request));
     }

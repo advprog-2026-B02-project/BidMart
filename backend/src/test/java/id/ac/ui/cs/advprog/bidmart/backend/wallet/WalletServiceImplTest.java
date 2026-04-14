@@ -115,6 +115,21 @@ class WalletServiceImplTest {
         assertEquals(0, response.getHeldBalance());
     }
 
+    @Test
+    void resetWalletShouldReleaseActiveHolds() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+        
+        BalanceHold hold = BalanceHold.builder()
+                .status(HoldStatus.ACTIVE)
+                .amount(100L)
+                .build();
+        when(holdRepository.findAllByWalletId(wallet.getId())).thenReturn(List.of(hold));
+
+        walletService.resetWallet(userId);
+        assertEquals(HoldStatus.RELEASED, hold.getStatus());
+    }
+
     
 
     @Test
@@ -171,7 +186,7 @@ class WalletServiceImplTest {
                 .id(holdId)
                 .walletId(wallet.getId())
                 .userId(userId)
-                .amount(300000)
+                .amount(300000L)
                 .status(HoldStatus.ACTIVE)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -185,6 +200,30 @@ class WalletServiceImplTest {
         assertEquals("RELEASED", response.getStatus());
         assertEquals(1000000, wallet.getAvailableBalance()); 
         assertEquals(0, wallet.getHeldBalance());
+    }
+
+    @Test
+    void releaseHold_NotFound() {
+        UUID holdId = UUID.randomUUID();
+        when(holdRepository.findById(holdId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> walletService.releaseHold(holdId));
+    }
+
+    @Test
+    void releaseHold_NotActive() {
+        UUID holdId = UUID.randomUUID();
+        BalanceHold hold = BalanceHold.builder().status(HoldStatus.RELEASED).build();
+        when(holdRepository.findById(holdId)).thenReturn(Optional.of(hold));
+        assertThrows(IllegalStateException.class, () -> walletService.releaseHold(holdId));
+    }
+
+    @Test
+    void releaseHold_WalletNotFound() {
+        UUID holdId = UUID.randomUUID();
+        BalanceHold hold = BalanceHold.builder().status(HoldStatus.ACTIVE).walletId(UUID.randomUUID()).build();
+        when(holdRepository.findById(holdId)).thenReturn(Optional.of(hold));
+        when(walletRepository.findById(hold.getWalletId())).thenReturn(Optional.empty());
+        assertThrows(IllegalStateException.class, () -> walletService.releaseHold(holdId));
     }
 
     
@@ -227,5 +266,21 @@ class WalletServiceImplTest {
 
         assertThrows(IllegalStateException.class,
                 () -> walletService.captureHold(holdId));
+    }
+
+    @Test
+    void captureHold_NotFound() {
+        UUID holdId = UUID.randomUUID();
+        when(holdRepository.findById(holdId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> walletService.captureHold(holdId));
+    }
+
+    @Test
+    void captureHold_WalletNotFound() {
+        UUID holdId = UUID.randomUUID();
+        BalanceHold hold = BalanceHold.builder().status(HoldStatus.ACTIVE).walletId(UUID.randomUUID()).build();
+        when(holdRepository.findById(holdId)).thenReturn(Optional.of(hold));
+        when(walletRepository.findById(hold.getWalletId())).thenReturn(Optional.empty());
+        assertThrows(IllegalStateException.class, () -> walletService.captureHold(holdId));
     }
 }
