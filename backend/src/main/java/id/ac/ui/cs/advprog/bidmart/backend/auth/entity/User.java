@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users", indexes = {
@@ -12,8 +13,8 @@ import java.time.Instant;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false, unique = true, length = 320)
     private String email;
@@ -45,7 +46,7 @@ public class User {
         this.updatedAt = Instant.now();
     }
 
-    public Long getId() { return id; }
+    public UUID getId() { return id; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email.toLowerCase().trim(); }

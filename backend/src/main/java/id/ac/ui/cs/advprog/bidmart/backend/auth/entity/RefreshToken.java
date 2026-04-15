@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "refresh_tokens", indexes = {
@@ -13,8 +14,8 @@ import java.time.Instant;
 public class RefreshToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Setter
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -36,7 +37,7 @@ public class RefreshToken {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
-    public Long getId() { return id; }
+    public UUID getId() { return id; }
 
     public User getUser() { return user; }
 

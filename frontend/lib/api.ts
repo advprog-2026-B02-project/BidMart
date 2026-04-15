@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
 async function parseError(res: Response | null) {
     if (!res || res.status === 0) {
@@ -144,7 +144,7 @@ export async function login(email: string, password: string) {
 export async function me() {
     try {
         const accessToken = getAccessToken();
-        const res = await fetch(`${BASE_URL}/users/me`, {
+        const res = await fetch(`${BASE_URL}/me`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",

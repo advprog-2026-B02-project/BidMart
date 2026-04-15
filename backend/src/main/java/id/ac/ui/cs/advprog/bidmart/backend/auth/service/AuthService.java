@@ -77,7 +77,7 @@ public class AuthService {
         u.setEmail(normalized);
         u.setPasswordHash(passwordEncoder.encode(rawPassword));
         u.setDisplayName(displayName);
-        u.setEmailVerified(false);
+        u.setEmailVerified(true);
         users.save(u);
 
         sendVerificationProcedure(u);

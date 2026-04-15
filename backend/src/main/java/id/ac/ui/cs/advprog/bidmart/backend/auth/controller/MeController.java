@@ -29,7 +29,11 @@ public class MeController {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
 
-        String email = auth.getName();
+        String email = extractEmailFromAuth(auth);
+        if (email == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid token"));
+        }
+        
         Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
@@ -51,7 +55,11 @@ public class MeController {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
 
-        String email = auth.getName();
+        String email = extractEmailFromAuth(auth);
+        if (email == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid token"));
+        }
+        
         Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
@@ -70,5 +78,20 @@ public class MeController {
                 "displayName", user.getDisplayName(),
                 "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
         ));
+    }
+
+    private String extractEmailFromAuth(Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) {
+            return null;
+        }
+        try {
+            if (auth.getPrincipal() instanceof Map) {
+                Map<String, Object> principal = (Map<String, Object>) auth.getPrincipal();
+                return (String) principal.get("email");
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        return null;
     }
 }

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 public class JwtService {
     private final AuthProperties props;
@@ -20,7 +21,7 @@ public class JwtService {
         this.key = Keys.hmacShaKeyFor(props.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Long userId, String email) {
+    public String generateAccessToken(UUID userId, String email) {
         Instant now = Instant.now();
         Instant exp = now.plusMillis(props.getAccessTokenExpiration());
 

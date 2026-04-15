@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -52,7 +53,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         try {
             var claims = jwtService.parseClaims(token);
 
-            Long userId = Long.valueOf(claims.getSubject()); // read userId from subject
+            UUID userId = UUID.fromString(claims.getSubject()); // read userId from subject as UUID
             String email = claims.get("email", String.class);
 
             Map<String, Object> principal = Map.of(
