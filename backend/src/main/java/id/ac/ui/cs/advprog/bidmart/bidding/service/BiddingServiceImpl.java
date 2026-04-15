@@ -135,7 +135,7 @@ public class BiddingServiceImpl implements BiddingService {
         return newBid;
     }
 
-    // HELPER 2: Skenario penawar lama bertahan (auto-bid)
+    // skenario penawar lama bertahan (auto-bid)
     private Bid processLosingProxyBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now) {
         BigDecimal increment = auction.getMinimumIncrement();
         BigDecimal newCurrentPrice = incomingMaxAmount.add(increment);

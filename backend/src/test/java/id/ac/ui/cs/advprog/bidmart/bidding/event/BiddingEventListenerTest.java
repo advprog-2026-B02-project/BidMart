@@ -147,4 +147,66 @@ class BiddingEventListenerTest {
         Map<?, ?> data = (Map<?, ?>) payloadCaptor.getValue().get("data");
         assertEquals("UNSOLD", data.get("status"));
     }
+
+    @Test
+    void handleBidPlacedEvent_ShouldLogAndContinue_WhenWalletReleaseFundsFails() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
+
+        // simulate error pas release funds
+        doThrow(new RuntimeException("Wallet system down")).when(walletClient).releaseFunds(outbidHoldId);
+
+        eventListener.handleBidPlacedEvent(event);
+
+        // verify websocket tetep dikirim meskipun wallet error
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/auctions/" + auctionId), any(Map.class));
+    }
+
+    @Test
+    void handleBidPlacedEvent_ShouldLogAndContinue_WhenNotificationFails() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
+
+        doThrow(new RuntimeException("Notification service down")).when(notificationClient).sendOutbidNotification(any(), any());
+
+        eventListener.handleBidPlacedEvent(event);
+
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(anyString(), any(Map.class));
+    }
+
+    @Test
+    void handleAuctionUnsoldEvent_Success_FullCoverage() {
+        // tangani lelang yang berakhir tanpa pemenang
+        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId);
+
+        eventListener.handleAuctionUnsoldEvent(event);
+
+        // pastiin wallet melepas semua hold dana untuk auction tersebut
+        verify(walletClient).releaseAllAuctionHolds(auctionId);
+
+        // pastiin websocket ngirim info UNSOLD
+        verify(messagingTemplate).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
+        Map<String, Object> payload = payloadCaptor.getValue();
+        assertEquals("AUCTION_ENDED", payload.get("type"));
+
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        assertEquals("UNSOLD", data.get("status"));
+    }
+
+    @Test
+    void handleEvents_ShouldLog_WhenWebsocketFails() {
+        // trigger catch block di handleBidPlacedEvent
+        when(auctionRepository.findById(any())).thenReturn(Optional.of(auction));
+        doThrow(new RuntimeException("Simulated WS Fail")).when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
+
+        eventListener.handleBidPlacedEvent(new BidPlacedEvent(auctionId, bidderId, BigDecimal.ONE, null, null));
+
+        // trigger catch block di handleAuctionWonEvent
+        eventListener.handleAuctionWonEvent(new AuctionWonEvent(auctionId, bidderId, BigDecimal.TEN));
+
+        // trigger catch block di handleAuctionUnsoldEvent
+        eventListener.handleAuctionUnsoldEvent(new AuctionUnsoldEvent(auctionId));
+
+        verify(messagingTemplate, atLeast(3)).convertAndSend(anyString(), any(Map.class));
+    }
 }

@@ -329,4 +329,127 @@ class BiddingServiceImplTest {
         verify(auctionRepository).save(auction);
         verify(eventPublisher).publishEvent(any(AuctionUnsoldEvent.class));
     }
+
+    @Test
+    void placeBid_ProxyCap_Winning_Flow() {
+        // harga sekarang 100k, increment 10k.
+        auction.setCurrentPrice(new BigDecimal("100000"));
+        auction.setMinimumIncrement(new BigDecimal("10000"));
+
+        // penawar lama punya max 150k
+        auction.setHighestBidderId(oldBidderId);
+        auction.setHighestBidderMaxAmount(new BigDecimal("150000"));
+        auction.setHighestBidderHoldId(UUID.randomUUID());
+
+        // penawar baru masukin limit 155k (Cuma beda 5k dari max lama)
+        BidRequestDTO request = new BidRequestDTO();
+        request.setAmount(new BigDecimal("155000"));
+
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        biddingService.placeBid(auctionId, bidderId, request);
+
+        // 150k + 10k = 160k
+        // tapi karena limit baru cuma 155k, maka harga harusnya mentok di 155k
+        assertEquals(0, new BigDecimal("155000").compareTo(auction.getCurrentPrice()));
+    }
+
+    @Test
+    void placeBid_ReserveMet_Flow() {
+        // set reservePrice di 100k
+        auction.setCurrentPrice(new BigDecimal("100000"));
+        auction.setMinimumIncrement(new BigDecimal("10000"));
+        auction.setReservePrice(new BigDecimal("100000")); // reserve diset sama dengan harga start
+        auction.setHighestBidderId(null);
+
+        BidRequestDTO request = new BidRequestDTO();
+        request.setAmount(new BigDecimal("250000"));
+
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        biddingService.placeBid(auctionId, bidderId, request);
+
+        // newCurrentPrice (100k) >= reservePrice (100k) -> harusnya true
+        assertTrue(auction.getReserveMet());
+        assertEquals(0, new BigDecimal("100000").compareTo(auction.getCurrentPrice()));
+    }
+
+    @Test
+    void placeBid_LosingProxy_But_ReserveIsMet() {
+        auction.setCurrentPrice(new BigDecimal("100000"));
+        auction.setMinimumIncrement(new BigDecimal("10000"));
+        auction.setReservePrice(new BigDecimal("150000")); // reserve di 150k
+
+        // penawar lama limitnya tinggi banget
+        auction.setHighestBidderId(oldBidderId);
+        auction.setHighestBidderMaxAmount(new BigDecimal("500000")); // limit 500k
+        auction.setHighestBidderHoldId(UUID.randomUUID());
+
+        // penawar baru masuk dengan angka yang ngelewatin reserve tapi tetep kalah ama penawar lama
+        BidRequestDTO request = new BidRequestDTO();
+        request.setAmount(new BigDecimal("160000")); // 160k > 150k (reserve), tapi < 500k (kalah)
+
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        biddingService.placeBid(auctionId, bidderId, request);
+
+        // meskipun kalah (OUTBID), harga lelang naik dan reserve price terpenuhi
+        assertTrue(auction.getReserveMet());
+
+        // harga baru harusnya 160k + 10k = 170k
+        assertEquals(0, new BigDecimal("170000").compareTo(auction.getCurrentPrice()));
+    }
+
+    @Test
+    void placeBid_LosingProxy_CapAtMaxAmount() {
+        // current 100k, Increment 10k.
+        auction.setCurrentPrice(new BigDecimal("100000"));
+        auction.setHighestBidderMaxAmount(new BigDecimal("200000")); // max lama 200k
+        auction.setHighestBidderId(oldBidderId);
+
+        BidRequestDTO request = new BidRequestDTO();
+        request.setAmount(new BigDecimal("195000")); // bidder baru nawar 195k (kalah)
+
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        // harus di-mock biar holdId ga null pas mau di-release
+        when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
+        when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        biddingService.placeBid(auctionId, bidderId, request);
+
+        // harga naik jadi 200k (max penawar lama), bukan 205k (195k + 10k) karena mentok
+        assertEquals(new BigDecimal("200000"), auction.getCurrentPrice());
+        verify(walletClient).releaseFunds(holdId);
+    }
+
+    @Test
+    void validateAuctionIsActive_ThrowsWhenNotActive() {
+        auction.setStatus(AuctionStatus.WON);
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        assertThrows(IllegalStateException.class, () ->
+                biddingService.placeBid(auctionId, bidderId, new BidRequestDTO())
+        );
+    }
+
+    @Test
+    void getAuctionResult_Coverage_ReturnStatement() {
+        // lmao
+        auction.setStatus(AuctionStatus.WON);
+        auction.setHighestBidderId(bidderId);
+        auction.setReserveMet(true);
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+
+        AuctionResultDTO result = biddingService.getAuctionResult(auctionId);
+
+        assertNotNull(result);
+        assertEquals(auctionId, result.getAuctionId());
+    }
 }
