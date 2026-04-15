@@ -23,6 +23,8 @@ public class BiddingEventListener {
     private final SimpMessagingTemplate messagingTemplate;
     private final AuctionRepository auctionRepository;
 
+    private static final String AUCTION_TOPIC_PREFIX = "/topic/auctions/";
+
     @Async
     @EventListener
     public void handleBidPlacedEvent(BidPlacedEvent event) {
@@ -57,7 +59,7 @@ public class BiddingEventListener {
                 payload.put("type", "NEW_BID");
                 payload.put("data", data);
 
-                messagingTemplate.convertAndSend("/topic/auctions/" + event.auctionId(), payload);
+                messagingTemplate.convertAndSend(AUCTION_TOPIC_PREFIX + event.auctionId(), payload);
 
                 // cek dan broadcast juga jika terjadi perpanjangan waktu lelang (anti-sniping)
                 if (auction.getExtensionCount() > 0) {
@@ -69,7 +71,7 @@ public class BiddingEventListener {
                     extPayload.put("type", "AUCTION_EXTENDED");
                     extPayload.put("data", extData);
 
-                    messagingTemplate.convertAndSend("/topic/auctions/" + event.auctionId(), extPayload);
+                    messagingTemplate.convertAndSend(AUCTION_TOPIC_PREFIX + event.auctionId(), extPayload);
                 }
             });
         } catch (Exception e) {
@@ -96,7 +98,7 @@ public class BiddingEventListener {
             payload.put("type", "AUCTION_ENDED");
             payload.put("data", data);
 
-            messagingTemplate.convertAndSend("/topic/auctions/" + event.auctionId(), payload);
+            messagingTemplate.convertAndSend(AUCTION_TOPIC_PREFIX + event.auctionId(), payload);
         } catch (Exception e) {
             log.error("gagal memproses kemenangan lelang: {}", event.auctionId(), e);
         }
@@ -116,7 +118,7 @@ public class BiddingEventListener {
             payload.put("type", "AUCTION_ENDED");
             payload.put("data", data);
 
-            messagingTemplate.convertAndSend("/topic/auctions/" + event.auctionId(), payload);
+            messagingTemplate.convertAndSend(AUCTION_TOPIC_PREFIX + event.auctionId(), payload);
         } catch (Exception e) {
             log.error("gagal memproses kegagalan lelang: {}", event.auctionId(), e);
         }

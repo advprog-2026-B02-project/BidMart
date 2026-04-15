@@ -34,58 +34,125 @@ public class BiddingServiceImpl implements BiddingService {
     private final WalletClient walletClient;
     private final ApplicationEventPublisher eventPublisher;
 
+    private static final String AUCTION_NOT_FOUND_MSG = "lelang tidak ditemukan";
+
     // anotasi transactional menjamin pessimistic lock bekerja dan rollback otomatis jika gagal
     @Override
     @Transactional
     public BidResponseDTO placeBid(UUID auctionId, UUID bidderId, BidRequestDTO requestDTO) {
         // fetch data dengan pessimistic lock untuk mencegah race condition
-        Auction auction = auctionRepository.findByIdWithPessimisticLock(auctionId).orElseThrow(() -> new IllegalArgumentException("lelang tidak ditemukan"));
+        Auction auction = auctionRepository.findByIdWithPessimisticLock(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException(AUCTION_NOT_FOUND_MSG));
 
         LocalDateTime now = LocalDateTime.now();
 
         // validasi status dan waktu lelang
         validateAuctionIsActive(auction, now);
 
-        // validasi nominal penawaran
-        validateBidAmount(auction, requestDTO.getAmount());
+        // amount yang dikirim user sekarang dianggap sebagai max amount (batas maksimal mereka)
+        BigDecimal incomingMaxAmount = requestDTO.getAmount();
+        validateBidAmount(auction, incomingMaxAmount);
 
-        // simpan data bidder sebelumnya untuk keperluan release dana
-        UUID previousBidderId = auction.getHighestBidderId();
-        BigDecimal previousPrice = auction.getCurrentPrice();
-        UUID outbidHoldId = auction.getHighestBidderHoldId();
-
-        // interaksi dengan modul wallet secara sinkronus untuk menahan dana
-        UUID holdId = walletClient.holdFunds(bidderId, auctionId, requestDTO.getAmount());
+        // tahan dana sebesar max amount
+        UUID holdId = walletClient.holdFunds(bidderId, auctionId, incomingMaxAmount);
 
         try {
             // eksekusi logika perpanjangan waktu
             handleAntiSniping(auction, now);
 
-            // perbarui state lelang beserta hold id dari penawar terbaru
-            auction.setCurrentPrice(requestDTO.getAmount());
-            auction.setHighestBidderId(bidderId);
-            auction.setHighestBidderHoldId(holdId);
-            auction.setBidCount(auction.getBidCount() + 1);
+            // ambil batas max penawar tertinggi saat ini (kalau belum ada anggap 0)
+            BigDecimal currentMaxAmount = auction.getHighestBidderMaxAmount() != null
+                    ? auction.getHighestBidderMaxAmount()
+                    : BigDecimal.ZERO;
 
-            if (requestDTO.getAmount().compareTo(auction.getReservePrice()) >= 0) {
-                auction.setReserveMet(true);
+            BigDecimal increment = auction.getMinimumIncrement();
+            BigDecimal previousPrice = auction.getCurrentPrice();
+            Bid newBid = new Bid();
+
+            // skenario 1: penawar baru menang
+            if (incomingMaxAmount.compareTo(currentMaxAmount) > 0) {
+                BigDecimal newCurrentPrice;
+
+                if (auction.getHighestBidderId() == null) {
+                    // lelang masih kosong, harga stay di pembukaan atau start price
+                    newCurrentPrice = auction.getCurrentPrice();
+                } else {
+                    // outbid penawar lama, harga baru = max lama + increment
+                    newCurrentPrice = currentMaxAmount.add(increment);
+                    // cegah harga melebihi batas max penawar baru
+                    if (newCurrentPrice.compareTo(incomingMaxAmount) > 0) {
+                        newCurrentPrice = incomingMaxAmount;
+                    }
+                }
+
+                // catat data lama untuk event pelepasan dana
+                UUID previousBidderId = auction.getHighestBidderId();
+                UUID outbidHoldId = auction.getHighestBidderHoldId();
+
+                // perbarui state lelang ke penawar baru
+                auction.setCurrentPrice(newCurrentPrice);
+                auction.setHighestBidderId(bidderId);
+                auction.setHighestBidderHoldId(holdId);
+                auction.setHighestBidderMaxAmount(incomingMaxAmount);
+                auction.setBidCount(auction.getBidCount() + 1);
+
+                if (newCurrentPrice.compareTo(auction.getReservePrice()) >= 0) {
+                    auction.setReserveMet(true);
+                }
+
+                // simpan bid baru sebagai accepted
+                newBid.setAuction(auction);
+                newBid.setBidderId(bidderId);
+                newBid.setAmount(newCurrentPrice);
+                newBid.setStatus(BidStatus.ACCEPTED);
+                newBid.setHoldId(holdId);
+                newBid.setCreatedAt(now);
+                newBid = bidRepository.save(newBid);
+
+                // broadcast event outbid untuk penawar lama kalau ada
+                if (previousBidderId != null) {
+                    eventPublisher.publishEvent(new BidPlacedEvent(auctionId, bidderId, newCurrentPrice, previousBidderId, outbidHoldId));
+                } else {
+                    eventPublisher.publishEvent(new BidPlacedEvent(auctionId, bidderId, newCurrentPrice, null, null));
+                }
+            }
+
+            // skenario 2: penawar lama bertahan (auto-bid)
+            else {
+                // harga naik ke max penawar baru + increment
+                BigDecimal newCurrentPrice = incomingMaxAmount.add(increment);
+
+                // tapi ga boleh melebihi batas max penawar lama
+                if (newCurrentPrice.compareTo(currentMaxAmount) > 0) {
+                    newCurrentPrice = currentMaxAmount;
+                }
+
+                auction.setCurrentPrice(newCurrentPrice);
+                auction.setBidCount(auction.getBidCount() + 1);
+
+                if (newCurrentPrice.compareTo(auction.getReservePrice()) >= 0) {
+                    auction.setReserveMet(true);
+                }
+
+                // simpan bid baru tapi statusnya langsung outbid karena kalah saing
+                newBid.setAuction(auction);
+                newBid.setBidderId(bidderId);
+                newBid.setAmount(incomingMaxAmount);
+                newBid.setStatus(BidStatus.OUTBID);
+                newBid.setHoldId(holdId);
+                newBid.setCreatedAt(now);
+                newBid = bidRepository.save(newBid);
+
+                // lepas dana penawar baru detik itu juga karena dia langsung kalah
+                walletClient.releaseFunds(holdId);
+
+                // penawar lama ga perlu ditahan dananya lagi karena dari awal udah ditahan full max
+
+                // broadcast update harga baru ke websocket (tanpa outbid id karena pemenangnya tetep sama)
+                eventPublisher.publishEvent(new BidPlacedEvent(auctionId, auction.getHighestBidderId(), newCurrentPrice, null, null));
             }
 
             auctionRepository.save(auction);
-
-            // catat riwayat penawaran ke database
-            Bid newBid = new Bid();
-            newBid.setAuction(auction);
-            newBid.setBidderId(bidderId);
-            newBid.setAmount(requestDTO.getAmount());
-            newBid.setStatus(BidStatus.ACCEPTED);
-            newBid.setHoldId(holdId);
-            newBid.setCreatedAt(now);
-            newBid = bidRepository.save(newBid);
-
-            // publish event untuk memicu proses asinkronus seperti pelepasan dana penawar lama
-            eventPublisher.publishEvent(new BidPlacedEvent(auctionId, bidderId, requestDTO.getAmount(), previousBidderId, outbidHoldId));
-
             return buildResponse(newBid, auction, previousPrice);
 
         } catch (Exception e) {
@@ -151,7 +218,7 @@ public class BiddingServiceImpl implements BiddingService {
     @Override
     @Transactional(readOnly = true)
     public AuctionResponseDTO getAuctionStatus(UUID auctionId) {
-        Auction auction = auctionRepository.findById(auctionId).orElseThrow(() -> new IllegalArgumentException("lelang tidak ditemukan"));
+        Auction auction = auctionRepository.findById(auctionId).orElseThrow(() -> new IllegalArgumentException(AUCTION_NOT_FOUND_MSG));
         return mapToAuctionResponse(auction);
     }
 
@@ -165,7 +232,7 @@ public class BiddingServiceImpl implements BiddingService {
     @Override
     @Transactional(readOnly = true)
     public AuctionResultDTO getAuctionResult(UUID auctionId) {
-        Auction auction = auctionRepository.findById(auctionId).orElseThrow(() -> new IllegalArgumentException("lelang tidak ditemukan"));
+        Auction auction = auctionRepository.findById(auctionId).orElseThrow(() -> new IllegalArgumentException(AUCTION_NOT_FOUND_MSG));
 
         if (auction.getStatus() == AuctionStatus.ACTIVE || auction.getStatus() == AuctionStatus.EXTENDED) {
             throw new IllegalStateException("lelang masih berlangsung");

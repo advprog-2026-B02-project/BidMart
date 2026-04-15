@@ -35,7 +35,7 @@ public class BiddingController {
         // pengecekan idempotency untuk mencegah duplikasi penawaran
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
             try {
-                IdempotencyRecord record = IdempotencyRecord.builder()
+                IdempotencyRecord idempotencyRecord = IdempotencyRecord.builder()
                         .idempotencyKey(idempotencyKey)
                         .userId(bidderId)
                         .requestPath("/auctions/" + auctionId + "/bids")
@@ -43,7 +43,7 @@ public class BiddingController {
                         .build();
 
                 // saveandflush akan langsung memicu error jika key sudah ada di database
-                idempotencyRecordRepository.saveAndFlush(record);
+                idempotencyRecordRepository.saveAndFlush(idempotencyRecord);
             } catch (DataIntegrityViolationException e) {
                 // jika terjadi error duplikasi, tolak request dengan status 409 conflict
                 return ResponseEntity.status(HttpStatus.CONFLICT)

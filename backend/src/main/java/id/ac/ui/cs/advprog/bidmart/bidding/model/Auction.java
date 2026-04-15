@@ -37,6 +37,7 @@ public class Auction {
     private UUID highestBidderId;
     private String highestBidderName;
     private UUID highestBidderHoldId;
+    private BigDecimal highestBidderMaxAmount;
 
     private LocalDateTime startTime;
     private LocalDateTime endTime;
