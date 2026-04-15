@@ -65,101 +65,111 @@ public class BiddingServiceImpl implements BiddingService {
                     ? auction.getHighestBidderMaxAmount()
                     : BigDecimal.ZERO;
 
-            BigDecimal increment = auction.getMinimumIncrement();
             BigDecimal previousPrice = auction.getCurrentPrice();
-            Bid newBid = new Bid();
+            Bid newBid;
 
-            // skenario 1: penawar baru menang
+            // Logika if-else utama dipisah ke helper method
             if (incomingMaxAmount.compareTo(currentMaxAmount) > 0) {
-                BigDecimal newCurrentPrice;
-
-                if (auction.getHighestBidderId() == null) {
-                    // lelang masih kosong, harga stay di pembukaan atau start price
-                    newCurrentPrice = auction.getCurrentPrice();
-                } else {
-                    // outbid penawar lama, harga baru = max lama + increment
-                    newCurrentPrice = currentMaxAmount.add(increment);
-                    // cegah harga melebihi batas max penawar baru
-                    if (newCurrentPrice.compareTo(incomingMaxAmount) > 0) {
-                        newCurrentPrice = incomingMaxAmount;
-                    }
-                }
-
-                // catat data lama untuk event pelepasan dana
-                UUID previousBidderId = auction.getHighestBidderId();
-                UUID outbidHoldId = auction.getHighestBidderHoldId();
-
-                // perbarui state lelang ke penawar baru
-                auction.setCurrentPrice(newCurrentPrice);
-                auction.setHighestBidderId(bidderId);
-                auction.setHighestBidderHoldId(holdId);
-                auction.setHighestBidderMaxAmount(incomingMaxAmount);
-                auction.setBidCount(auction.getBidCount() + 1);
-
-                if (newCurrentPrice.compareTo(auction.getReservePrice()) >= 0) {
-                    auction.setReserveMet(true);
-                }
-
-                // simpan bid baru sebagai accepted
-                newBid.setAuction(auction);
-                newBid.setBidderId(bidderId);
-                newBid.setAmount(newCurrentPrice);
-                newBid.setStatus(BidStatus.ACCEPTED);
-                newBid.setHoldId(holdId);
-                newBid.setCreatedAt(now);
-                newBid = bidRepository.save(newBid);
-
-                // broadcast event outbid untuk penawar lama kalau ada
-                if (previousBidderId != null) {
-                    eventPublisher.publishEvent(new BidPlacedEvent(auctionId, bidderId, newCurrentPrice, previousBidderId, outbidHoldId));
-                } else {
-                    eventPublisher.publishEvent(new BidPlacedEvent(auctionId, bidderId, newCurrentPrice, null, null));
-                }
-            }
-
-            // skenario 2: penawar lama bertahan (auto-bid)
-            else {
-                // harga naik ke max penawar baru + increment
-                BigDecimal newCurrentPrice = incomingMaxAmount.add(increment);
-
-                // tapi ga boleh melebihi batas max penawar lama
-                if (newCurrentPrice.compareTo(currentMaxAmount) > 0) {
-                    newCurrentPrice = currentMaxAmount;
-                }
-
-                auction.setCurrentPrice(newCurrentPrice);
-                auction.setBidCount(auction.getBidCount() + 1);
-
-                if (newCurrentPrice.compareTo(auction.getReservePrice()) >= 0) {
-                    auction.setReserveMet(true);
-                }
-
-                // simpan bid baru tapi statusnya langsung outbid karena kalah saing
-                newBid.setAuction(auction);
-                newBid.setBidderId(bidderId);
-                newBid.setAmount(incomingMaxAmount);
-                newBid.setStatus(BidStatus.OUTBID);
-                newBid.setHoldId(holdId);
-                newBid.setCreatedAt(now);
-                newBid = bidRepository.save(newBid);
-
-                // lepas dana penawar baru detik itu juga karena dia langsung kalah
-                walletClient.releaseFunds(holdId);
-
-                // penawar lama ga perlu ditahan dananya lagi karena dari awal udah ditahan full max
-
-                // broadcast update harga baru ke websocket (tanpa outbid id karena pemenangnya tetep sama)
-                eventPublisher.publishEvent(new BidPlacedEvent(auctionId, auction.getHighestBidderId(), newCurrentPrice, null, null));
+                newBid = processWinningBid(auction, bidderId, incomingMaxAmount, currentMaxAmount, holdId, now);
+            } else {
+                newBid = processLosingProxyBid(auction, bidderId, incomingMaxAmount, currentMaxAmount, holdId, now);
             }
 
             auctionRepository.save(auction);
             return buildResponse(newBid, auction, previousPrice);
 
         } catch (Exception e) {
-            // rollback dana jika terjadi kegagalan sistem pada database
             walletClient.releaseFunds(holdId);
             throw e;
         }
+    }
+
+    // skenario penawar baru menang
+    private Bid processWinningBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now) {
+        BigDecimal increment = auction.getMinimumIncrement();
+        BigDecimal newCurrentPrice;
+
+        if (auction.getHighestBidderId() == null) {
+            // lelang masih kosong, harga stay di pembukaan atau start price
+            newCurrentPrice = auction.getCurrentPrice();
+        } else {
+            // outbid penawar lama, harga baru = max lama + increment
+            newCurrentPrice = currentMaxAmount.add(increment);
+            // cegah harga melebihi batas max penawar baru
+            if (newCurrentPrice.compareTo(incomingMaxAmount) > 0) {
+                newCurrentPrice = incomingMaxAmount;
+            }
+        }
+
+        // catat data lama untuk event pelepasan dana
+        UUID previousBidderId = auction.getHighestBidderId();
+        UUID outbidHoldId = auction.getHighestBidderHoldId();
+
+        // perbarui state lelang ke penawar baru
+        auction.setCurrentPrice(newCurrentPrice);
+        auction.setHighestBidderId(bidderId);
+        auction.setHighestBidderHoldId(holdId);
+        auction.setHighestBidderMaxAmount(incomingMaxAmount);
+        auction.setBidCount(auction.getBidCount() + 1);
+
+        if (newCurrentPrice.compareTo(auction.getReservePrice()) >= 0) {
+            auction.setReserveMet(true);
+        }
+
+        Bid newBid = new Bid();
+        newBid.setAuction(auction);
+        newBid.setBidderId(bidderId);
+        newBid.setAmount(newCurrentPrice);
+        newBid.setStatus(BidStatus.ACCEPTED);
+        newBid.setHoldId(holdId);
+        newBid.setCreatedAt(now);
+        newBid = bidRepository.save(newBid);
+
+        // broadcast event outbid untuk penawar lama kalau ada
+        if (previousBidderId != null) {
+            eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), bidderId, newCurrentPrice, previousBidderId, outbidHoldId));
+        } else {
+            eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), bidderId, newCurrentPrice, null, null));
+        }
+
+        return newBid;
+    }
+
+    // HELPER 2: Skenario penawar lama bertahan (auto-bid)
+    private Bid processLosingProxyBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now) {
+        BigDecimal increment = auction.getMinimumIncrement();
+        BigDecimal newCurrentPrice = incomingMaxAmount.add(increment);
+
+        // ga boleh melebihi batas max penawar lama
+        if (newCurrentPrice.compareTo(currentMaxAmount) > 0) {
+            newCurrentPrice = currentMaxAmount;
+        }
+
+        auction.setCurrentPrice(newCurrentPrice);
+        auction.setBidCount(auction.getBidCount() + 1);
+
+        if (newCurrentPrice.compareTo(auction.getReservePrice()) >= 0) {
+            auction.setReserveMet(true);
+        }
+
+        Bid newBid = new Bid();
+        newBid.setAuction(auction);
+        newBid.setBidderId(bidderId);
+        newBid.setAmount(incomingMaxAmount);
+        newBid.setStatus(BidStatus.OUTBID);
+        newBid.setHoldId(holdId);
+        newBid.setCreatedAt(now);
+        newBid = bidRepository.save(newBid);
+
+        // lepas dana penawar baru detik itu juga karena dia langsung kalah
+        walletClient.releaseFunds(holdId);
+
+        // penawar lama ga perlu ditahan dananya lagi karena dari awal udah ditahan full max
+
+        // broadcast update harga baru ke websocket (tanpa outbid id karena pemenangnya tetep sama)
+        eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), auction.getHighestBidderId(), newCurrentPrice, null, null));
+
+        return newBid;
     }
 
     private void validateAuctionIsActive(Auction auction, LocalDateTime now) {
