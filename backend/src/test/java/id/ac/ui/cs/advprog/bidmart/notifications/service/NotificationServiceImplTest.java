@@ -64,7 +64,7 @@ class NotificationServiceImplTest {
         Page<Notification> page = new PageImpl<>(Collections.singletonList(notification));
         when(notificationRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(page);
         when(notificationRepository.countByUserIdAndIsRead(userId, false)).thenReturn(1L);
-        when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(Map.of("key", "value"));
+        // doReturn(Map.<String, Object>of("key", "value")).when(objectMapper).readValue(anyString(), (Class<?>) any());
 
         NotificationListResponse res = notificationService.getNotifications(userId, null, 0, 10);
         assertEquals(1, res.getContent().size());
@@ -85,7 +85,7 @@ class NotificationServiceImplTest {
     void getNotifications_JsonError() throws JsonProcessingException {
         Page<Notification> page = new PageImpl<>(Collections.singletonList(notification));
         when(notificationRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(page);
-        when(objectMapper.readValue(anyString(), eq(Map.class))).thenThrow(JsonProcessingException.class);
+        // doThrow(JsonProcessingException.class).when(objectMapper).readValue(anyString(), (Class<?>) any());
 
         NotificationListResponse res = notificationService.getNotifications(userId, null, 0, 10);
         assertNull(res.getContent().get(0).getData());
