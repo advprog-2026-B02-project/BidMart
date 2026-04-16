@@ -124,7 +124,13 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(String email, String rawPassword) {
-        User u = users.findByEmail(email.toLowerCase().trim()).orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+        Object loginResult = loginWithDesign(newLoginRequest(email, rawPassword), null);
+        if (loginResult instanceof PartialLoginResponseDTO) {
+            throw new IllegalStateException("2FA verification required");
+        }
+        LoginSuccessResponseDTO success = (LoginSuccessResponseDTO) loginResult;
+        return new AuthResponse(success.accessToken, success.refreshToken);
+    }
 
     @Transactional
     public Object loginWithDesign(LoginRequestDTO request, HttpServletRequest servletRequest) {
@@ -138,17 +144,11 @@ public class AuthService {
             throw new IllegalStateException("Email not verified");
         }
 
-        String accessToken = jwtService.generateAccessToken(u.getId(), u.getEmail());
+        if (u.isTwoFactorEnabled()) {
+            return createPartialSession(u);
+        }
 
-        RefreshToken rt = new RefreshToken();
-        rt.setUser(u);
-        rt.setToken(generateRefreshToken());
-        rt.setExpiresAt(Instant.now().plusMillis(authProps.getRefreshTokenExpiration()));
-        rt.setRevoked(false);
-
-        refreshTokens.save(rt);
-
-        return new AuthResponse(accessToken, rt.getToken());
+        return createLoginSuccess(u, servletRequest);
     }
 
     @Transactional
@@ -234,5 +234,151 @@ public class AuthService {
         if (t.getExpiresAt().isBefore(Instant.now())) {
             throw new IllegalArgumentException("Reset token expired");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public User getUserByEmail(String email) {
+        return users.findByEmail(email.toLowerCase().trim())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public User getUserById(UUID userId) {
+        return users.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
+
+    private LoginRequestDTO newLoginRequest(String email, String password) {
+        LoginRequestDTO req = new LoginRequestDTO();
+        req.email = email;
+        req.password = password;
+        return req;
+    }
+
+    private Object createPartialSession(User user) {
+        String method = resolveTwoFactorMethod(user);
+
+        PartialAuthSession partial = new PartialAuthSession();
+        partial.setUser(user);
+        partial.setPartialToken(generateRefreshToken());
+        partial.setMethods(method);
+        partial.setExpiresAt(Instant.now().plusSeconds(300));
+
+        if ("EMAIL".equals(method)) {
+            String code = generateNumericCode();
+            partial.setEmailOtpHash(passwordEncoder.encode(code));
+            partial.setEmailOtpExpiresAt(Instant.now().plusSeconds(300));
+            emailService.sendTwoFactorCodeEmail(user.getEmail(), code);
+        }
+
+        partialAuthSessions.save(partial);
+
+        return new PartialLoginResponseDTO(partial.getPartialToken(), true, List.of(method), 300);
+    }
+
+    private String resolveTwoFactorMethod(User user) {
+        String configured = user.getTwoFactorMethod();
+        if (configured != null && !configured.isBlank()) {
+            return configured.toUpperCase(Locale.ROOT);
+        }
+        if (user.getTwoFactorSecret() != null && !user.getTwoFactorSecret().isBlank()) {
+            return "TOTP";
+        }
+        return "EMAIL";
+    }
+
+    private boolean supportsMethod(String methods, String method) {
+        if (methods == null || methods.isBlank()) {
+            return false;
+        }
+        String target = method.toUpperCase(Locale.ROOT);
+        return Arrays.stream(methods.split(","))
+                .map(String::trim)
+                .map(s -> s.toUpperCase(Locale.ROOT))
+                .anyMatch(target::equals);
+    }
+
+    private String generateNumericCode() {
+        SecureRandom random = new SecureRandom();
+        int number = random.nextInt(900000) + 100000;
+        return String.valueOf(number);
+    }
+
+    private LoginSuccessResponseDTO createLoginSuccess(User user, HttpServletRequest servletRequest) {
+        RefreshToken session = new RefreshToken();
+        session.setUser(user);
+        session.setToken(generateRefreshToken());
+        session.setExpiresAt(Instant.now().plusMillis(authProps.getRefreshTokenExpiration()));
+        session.setRevoked(false);
+        session.setDevice(extractDevice(servletRequest));
+        session.setIpAddress(extractIp(servletRequest));
+        session.setLastActive(Instant.now());
+        refreshTokens.save(session);
+
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), session.getId(), user.getRolesList());
+
+        return new LoginSuccessResponseDTO(
+                accessToken,
+                session.getToken(),
+                authProps.getAccessTokenExpiration() / 1000,
+                toUserResponse(user)
+        );
+    }
+
+    private String extractDevice(HttpServletRequest request) {
+        if (request == null) {
+            return "Unknown device";
+        }
+        String ua = request.getHeader("User-Agent");
+        if (ua == null || ua.isBlank()) {
+            return "Unknown device";
+        }
+        return ua.length() > 180 ? ua.substring(0, 180) : ua;
+    }
+
+    private String extractIp(HttpServletRequest request) {
+        if (request == null) {
+            return "unknown";
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private List<String> generateBackupCodes() {
+        return List.of(
+                shortCode(),
+                shortCode(),
+                shortCode(),
+                shortCode(),
+                shortCode()
+        );
+    }
+
+    private String shortCode() {
+        // 6 bytes in Base64 URL-safe (without padding) produces exactly 8 chars.
+        byte[] bytes = new byte[6];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes).toUpperCase(Locale.ROOT);
+    }
+
+    private UserResponseDTO toUserResponse(User user) {
+        return new UserResponseDTO(
+                user.getId(),
+                user.getEmail(),
+                user.getDisplayName(),
+                user.isEmailVerified(),
+                user.getCreatedAt(),
+                user.getRolesList()
+        );
+    }
+
+    private RoleResponseDTO toRoleResponse(Role role) {
+        List<String> permissions = List.of();
+        if (role.getPermissions() != null && !role.getPermissions().isBlank()) {
+            permissions = List.of(role.getPermissions().split(","));
+        }
+        return new RoleResponseDTO(role.getId(), role.getName(), permissions);
     }
 }

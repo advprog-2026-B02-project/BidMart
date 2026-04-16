@@ -315,6 +315,99 @@ export async function validateResetToken(token: string) {
     }
 }
 
+export async function setupTwoFactor(method: "EMAIL" | "TOTP") {
+    try {
+        const token = getAccessToken();
+        if (!token) {
+            throw new Error("Sesi tidak ditemukan, silakan login ulang.");
+        }
+
+        const res = await fetch(`${BASE_URL}/auth/2fa/setup`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({method}),
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return await res.json();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function confirmTwoFactor(code: string) {
+    try {
+        const token = getAccessToken();
+        if (!token) {
+            throw new Error("Sesi tidak ditemukan, silakan login ulang.");
+        }
+
+        const res = await fetch(`${BASE_URL}/auth/2fa/confirm`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({code}),
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return await res.json();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function disableTwoFactor(password: string) {
+    try {
+        const token = getAccessToken();
+        if (!token) {
+            throw new Error("Sesi tidak ditemukan, silakan login ulang.");
+        }
+
+        const res = await fetch(`${BASE_URL}/auth/2fa`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({password}),
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        return await res.json();
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
 export async function updateProfile(displayName: string, avatarUrl: string) {
     try {
         const token = getAccessToken();
