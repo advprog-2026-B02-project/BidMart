@@ -63,23 +63,4 @@ public class EmailService {
         }
     }
 
-    @Async
-    public void sendTwoFactorCodeEmail(String to, String code) {
-        if (!mailEnabled) {
-            log.warn("Email sending disabled. 2FA code for {}: {}", to, code);
-            return;
-        }
-
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(to);
-            message.setSubject("Your BidMart 2FA Code");
-            message.setText("Your BidMart verification code is: " + code
-                    + "\n\nThis code expires in 5 minutes.");
-            mailSender.send(message);
-        } catch (MailException e) {
-            log.error("Failed to send 2FA email to {}: {}", to, e.getMessage());
-            log.info("Fallback 2FA code for {}: {}", to, code);
-        }
-    }
 }

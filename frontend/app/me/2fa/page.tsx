@@ -16,24 +16,6 @@ export default function TwoFactorPage() {
     const [totpCode, setTotpCode] = useState("");
     const [disablePassword, setDisablePassword] = useState("");
 
-    async function enableEmail2FA() {
-        setLoading(true);
-        setMsg(null);
-        setIsError(false);
-
-        try {
-            await setupTwoFactor("EMAIL");
-            setTotpSecret(null);
-            setMsg("2FA EMAIL berhasil diaktifkan. Login berikutnya akan minta kode email.");
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : "Gagal mengaktifkan 2FA EMAIL.";
-            setIsError(true);
-            setMsg(message);
-        } finally {
-            setLoading(false);
-        }
-    }
-
     async function startTotpSetup() {
         setLoading(true);
         setMsg(null);
@@ -93,10 +75,6 @@ export default function TwoFactorPage() {
     return (
         <AuthShell title="Kelola 2FA" subtitle="Atur metode two-factor authentication untuk akun Anda.">
             <div className="space-y-4">
-                <button disabled={loading} className={buttonCls} onClick={enableEmail2FA}>
-                    {loading ? "Memproses..." : "Aktifkan 2FA Email"}
-                </button>
-
                 <button
                     disabled={loading}
                     className="w-full rounded-xl py-4 text-lg font-bold text-[#002447] bg-[#002447]/10 hover:bg-[#002447]/20 transition-all"

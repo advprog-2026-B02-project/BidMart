@@ -10,7 +10,6 @@ import {login as apiLogin, verifyTwoFactor as apiVerifyTwoFactor} from "@/lib/ap
 type PartialLoginResponse = {
     partialToken: string;
     requires2FA: boolean;
-    methods: string[];
     expiresIn: number;
 };
 
@@ -25,8 +24,6 @@ export default function LoginPage() {
     const [isChecking, setIsChecking] = useState(true);
     const [msg, setMsg] = useState<string | null>(null);
     const [partialToken, setPartialToken] = useState<string | null>(null);
-    const [twoFactorMethods, setTwoFactorMethods] = useState<string[]>([]);
-    const [twoFactorMethod, setTwoFactorMethod] = useState("EMAIL");
     const [twoFactorCode, setTwoFactorCode] = useState("");
     const router = useRouter();
 
@@ -48,9 +45,7 @@ export default function LoginPage() {
             const result = await apiLogin(email, pass);
             if (isPartialResponse(result)) {
                 setPartialToken(result.partialToken);
-                setTwoFactorMethods(result.methods || []);
-                setTwoFactorMethod((result.methods && result.methods[0]) || "EMAIL");
-                setMsg("Kode verifikasi 2FA sudah dikirim. Masukkan kode untuk melanjutkan.");
+                setMsg("Masukkan kode TOTP dari authenticator untuk melanjutkan.");
                 return;
             }
 
@@ -75,7 +70,7 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await apiVerifyTwoFactor(partialToken, twoFactorMethod, twoFactorCode);
+            await apiVerifyTwoFactor(partialToken, twoFactorCode);
             router.push("/me");
         } catch (err: unknown) {
             const message =
@@ -100,23 +95,7 @@ export default function LoginPage() {
             {partialToken ? (
                 <form onSubmit={onVerifyTwoFactor} className="space-y-6">
                     <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-700">
-                        Verifikasi 2FA diperlukan sebelum melanjutkan login.
-                    </div>
-
-                    <div>
-                        <label className="block text-lg font-medium mb-2 text-[#002447]">Metode 2FA</label>
-                        <select
-                            className={inputCls}
-                            value={twoFactorMethod}
-                            onChange={(e) => setTwoFactorMethod(e.target.value)}
-                            disabled={loading}
-                        >
-                            {twoFactorMethods.map((method) => (
-                                <option key={method} value={method}>
-                                    {method}
-                                </option>
-                            ))}
-                        </select>
+                        Verifikasi 2FA TOTP diperlukan sebelum melanjutkan login.
                     </div>
 
                     <div>
@@ -146,8 +125,6 @@ export default function LoginPage() {
                         onClick={() => {
                             setPartialToken(null);
                             setTwoFactorCode("");
-                            setTwoFactorMethods([]);
-                            setTwoFactorMethod("EMAIL");
                             setMsg(null);
                         }}
                     >

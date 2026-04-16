@@ -3,7 +3,6 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
 type PartialLoginResponse = {
     partialToken: string;
     requires2FA: boolean;
-    methods: string[];
     expiresIn: number;
 };
 
@@ -163,12 +162,12 @@ export async function login(email: string, password: string) {
     }
 }
 
-export async function verifyTwoFactor(partialToken: string, method: string, code: string): Promise<LoginSuccessResponse> {
+export async function verifyTwoFactor(partialToken: string, code: string): Promise<LoginSuccessResponse> {
     try {
         const res = await fetch(`${BASE_URL}/auth/2fa/verify`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({partialToken, method, code}),
+            body: JSON.stringify({partialToken, method: "TOTP", code}),
         });
 
         if (!res.ok) {
@@ -315,7 +314,7 @@ export async function validateResetToken(token: string) {
     }
 }
 
-export async function setupTwoFactor(method: "EMAIL" | "TOTP") {
+export async function setupTwoFactor(method: "TOTP") {
     try {
         const token = getAccessToken();
         if (!token) {

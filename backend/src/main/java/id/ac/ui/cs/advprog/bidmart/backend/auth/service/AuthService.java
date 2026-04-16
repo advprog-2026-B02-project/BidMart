@@ -45,7 +45,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Arrays;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
@@ -272,23 +271,11 @@ public class AuthService {
         User user = partial.getUser();
         String method = request.method.trim().toUpperCase(Locale.ROOT);
 
-        if (!supportsMethod(partial.getMethods(), method)) {
+        if (!"TOTP".equals(method)) {
             throw new IllegalArgumentException("Unsupported 2FA method");
         }
 
-        boolean verified;
-        if ("TOTP".equals(method)) {
-            verified = totpService.verifyCode(user.getTwoFactorSecret(), request.code);
-        } else if ("EMAIL".equals(method)) {
-            Instant codeExpiry = partial.getEmailOtpExpiresAt();
-            if (codeExpiry == null || codeExpiry.isBefore(Instant.now())) {
-                throw new IllegalArgumentException("2FA code expired");
-            }
-            String otpHash = partial.getEmailOtpHash();
-            verified = otpHash != null && passwordEncoder.matches(request.code, otpHash);
-        } else {
-            throw new IllegalArgumentException("Unsupported 2FA method");
-        }
+        boolean verified = totpService.verifyCode(user.getTwoFactorSecret(), request.code);
 
         if (!verified) {
             throw new IllegalArgumentException("Invalid 2FA code");
@@ -302,18 +289,8 @@ public class AuthService {
 
     @Transactional
     public TwoFactorSetupResponseDTO setupTwoFactor(User user, String method) {
-        if ("EMAIL".equalsIgnoreCase(method)) {
-            user.setTwoFactorEnabled(true);
-            user.setTwoFactorMethod("EMAIL");
-            user.setTwoFactorSecret(null);
-            user.setTwoFactorTempSecret(null);
-            user.setTwoFactorBackupCodes(null);
-            users.save(user);
-            return new TwoFactorSetupResponseDTO(null, null, List.of());
-        }
-
         if (!"TOTP".equalsIgnoreCase(method)) {
-            throw new IllegalArgumentException("Only TOTP or EMAIL is supported");
+            throw new IllegalArgumentException("Only TOTP is supported");
         }
 
         String secret = totpService.generateBase32Secret();
@@ -566,52 +543,15 @@ public class AuthService {
     }
 
     private Object createPartialSession(User user) {
-        String method = resolveTwoFactorMethod(user);
-
         PartialAuthSession partial = new PartialAuthSession();
         partial.setUser(user);
         partial.setPartialToken(generateRefreshToken());
-        partial.setMethods(method);
+        partial.setMethods("TOTP");
         partial.setExpiresAt(Instant.now().plusSeconds(300));
-
-        if ("EMAIL".equals(method)) {
-            String code = generateNumericCode();
-            partial.setEmailOtpHash(passwordEncoder.encode(code));
-            partial.setEmailOtpExpiresAt(Instant.now().plusSeconds(300));
-            emailService.sendTwoFactorCodeEmail(user.getEmail(), code);
-        }
 
         partialAuthSessions.save(partial);
 
-        return new PartialLoginResponseDTO(partial.getPartialToken(), true, List.of(method), 300);
-    }
-
-    private String resolveTwoFactorMethod(User user) {
-        String configured = user.getTwoFactorMethod();
-        if (configured != null && !configured.isBlank()) {
-            return configured.toUpperCase(Locale.ROOT);
-        }
-        if (user.getTwoFactorSecret() != null && !user.getTwoFactorSecret().isBlank()) {
-            return "TOTP";
-        }
-        return "EMAIL";
-    }
-
-    private boolean supportsMethod(String methods, String method) {
-        if (methods == null || methods.isBlank()) {
-            return false;
-        }
-        String target = method.toUpperCase(Locale.ROOT);
-        return Arrays.stream(methods.split(","))
-                .map(String::trim)
-                .map(s -> s.toUpperCase(Locale.ROOT))
-                .anyMatch(target::equals);
-    }
-
-    private String generateNumericCode() {
-        SecureRandom random = new SecureRandom();
-        int number = random.nextInt(900000) + 100000;
-        return String.valueOf(number);
+        return new PartialLoginResponseDTO(partial.getPartialToken(), true, List.of("TOTP"), 300);
     }
 
     private LoginSuccessResponseDTO createLoginSuccess(User user, HttpServletRequest servletRequest) {
