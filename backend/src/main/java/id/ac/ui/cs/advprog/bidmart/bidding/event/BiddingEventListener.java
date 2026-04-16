@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.event;
 
-import id.ac.ui.cs.advprog.bidmart.bidding.client.NotificationClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.repository.AuctionRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,6 @@ import java.util.Map;
 public class BiddingEventListener {
 
     private final WalletClient walletClient;
-    private final NotificationClient notificationClient;
     private final SimpMessagingTemplate messagingTemplate;
     private final AuctionRepository auctionRepository;
 
@@ -34,7 +32,6 @@ public class BiddingEventListener {
         if (event.outbidUserId() != null && event.outbidHoldId() != null) {
             try {
                 walletClient.releaseFunds(event.outbidHoldId());
-                notificationClient.sendOutbidNotification(event.outbidUserId(), event.auctionId());
             } catch (Exception e) {
                 log.error("gagal melepas dana/notifikasi untuk hold id: {}", event.outbidHoldId(), e);
             }
@@ -84,7 +81,6 @@ public class BiddingEventListener {
     public void handleAuctionWonEvent(AuctionWonEvent event) {
         try {
             walletClient.captureWinnerFunds(event.auctionId(), event.winnerId());
-            notificationClient.sendAuctionWonNotification(event.winnerId(), event.auctionId());
 
             // broadcast lelang selesai
             Map<String, Object> payload = new HashMap<>();
