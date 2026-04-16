@@ -1,8 +1,9 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.controller;
 
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.ChangePasswordRequestDTO;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.UpdateProfileRequest;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.User;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -12,66 +13,30 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 public class MeController {
 
-    private final UserRepository userRepository;
+    private final AuthService authService;
 
-    public MeController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public MeController(AuthService authService) {
+        this.authService = authService;
     }
 
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication auth) {
-        if (auth == null || !auth.isAuthenticated()) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
+        return ResponseEntity.ok(profileMap(currentUser(auth)));
+    }
 
-        String email = extractEmailFromAuth(auth);
-        if (email == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid token"));
-        }
-        
-        Optional<User> userOpt = userRepository.findByEmail(email);
-
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
-        }
-
-        User user = userOpt.get();
-
-        return ResponseEntity.ok(Map.of(
-                "email", user.getEmail(),
-                "displayName", user.getDisplayName() != null ? user.getDisplayName() : "Pengguna Baru",
-                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
-        ));
+    @GetMapping("/users/me")
+    public ResponseEntity<?> meV2(Authentication auth) {
+        return ResponseEntity.ok(profileMap(currentUser(auth)));
     }
 
     @PutMapping("/me")
     public ResponseEntity<?> updateProfile(Authentication auth, @Valid @RequestBody UpdateProfileRequest req) {
-        if (auth == null || !auth.isAuthenticated()) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
-
-        String email = extractEmailFromAuth(auth);
-        if (email == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid token"));
-        }
-        
-        Optional<User> userOpt = userRepository.findByEmail(email);
-
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
-        }
-
-        User user = userOpt.get();
-
-        user.setDisplayName(req.displayName);
-        user.setAvatarUrl(req.avatarUrl);
-
-        userRepository.save(user);
+        User user = currentUser(auth);
+        user = authService.updateProfile(user, req.displayName, req.avatarUrl);
 
         return ResponseEntity.ok(Map.of(
                 "message", "Profil berhasil diperbarui",
@@ -80,18 +45,48 @@ public class MeController {
         ));
     }
 
-    private String extractEmailFromAuth(Authentication auth) {
-        if (auth == null || auth.getPrincipal() == null) {
-            return null;
+    @PutMapping("/users/me")
+    public ResponseEntity<?> updateProfileV2(Authentication auth, @Valid @RequestBody UpdateProfileRequest req) {
+        User user = currentUser(auth);
+        user = authService.updateProfile(user, req.displayName, req.avatarUrl);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Profil berhasil diperbarui",
+                "displayName", user.getDisplayName(),
+                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
+        ));
+    }
+
+    @PutMapping("/users/me/password")
+    public ResponseEntity<Map<String, String>> changePassword(Authentication auth,
+                                                              @Valid @RequestBody ChangePasswordRequestDTO req) {
+        authService.changePassword(currentUser(auth), req);
+        return ResponseEntity.ok(Map.of("message", "Password updated"));
+    }
+
+    private User currentUser(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new IllegalArgumentException("Unauthorized");
         }
-        try {
-            if (auth.getPrincipal() instanceof Map) {
-                Map<String, Object> principal = (Map<String, Object>) auth.getPrincipal();
-                return (String) principal.get("email");
-            }
-        } catch (Exception e) {
-            return null;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> principal = (Map<String, Object>) auth.getPrincipal();
+        Object email = principal.get("email");
+        if (email == null) {
+            throw new IllegalArgumentException("Unauthorized");
         }
-        return null;
+        return authService.getUserByEmail(email.toString());
+    }
+
+    private Map<String, Object> profileMap(User user) {
+        return Map.of(
+                "id", user.getId(),
+                "email", user.getEmail(),
+                "displayName", user.getDisplayName() != null ? user.getDisplayName() : "Pengguna Baru",
+                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                "roles", user.getRolesList(),
+                "emailVerified", user.isEmailVerified(),
+                "status", user.getStatus().name(),
+                "createdAt", user.getCreatedAt()
+        );
     }
 }

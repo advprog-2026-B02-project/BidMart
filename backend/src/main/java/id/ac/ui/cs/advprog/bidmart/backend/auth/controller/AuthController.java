@@ -5,6 +5,14 @@ import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginRequest;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginRequestDTO;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RefreshRequest;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RegisterRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RegisterRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.TwoFactorConfirmRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.TwoFactorDisableRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.TwoFactorSetupRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.TwoFactorVerifyRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.UserResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.VerifyEmailRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.User;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.service.AuthService;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,6 +88,11 @@ public class AuthController {
         return ResponseEntity.ok(auth.refresh(req.refreshToken));
     }
 
+    @PostMapping("/refresh-v2")
+    public ResponseEntity<?> refreshV2(@Valid @RequestBody RefreshRequest req) {
+        return ResponseEntity.ok(auth.refreshWithDesign(req.refreshToken));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestBody(required = false) RefreshRequest req) {
         if (req != null && req.refreshToken != null && !req.refreshToken.isBlank()) {
@@ -106,4 +119,9 @@ public class AuthController {
         auth.register(req.email, req.password, req.displayName);
         return ResponseEntity.ok().build();
     }
+
+    public ResponseEntity<AuthResponse> login(LoginRequest req) {
+        return ResponseEntity.ok(auth.login(req.email, req.password));
+    }
+
 }

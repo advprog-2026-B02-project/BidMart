@@ -1,17 +1,39 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.service;
 
-import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.PasswordResetToken;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.PasswordResetTokenRepository;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.security.JwtService;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.AuthResponse;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.User;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.RefreshToken;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.ChangePasswordRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginSuccessResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.PartialLoginResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RegisterRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RoleRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RoleResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.SessionResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.TwoFactorSetupResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.TwoFactorVerifyRequestDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.UserResponseDTO;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.PasswordResetToken;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.EmailVerificationToken;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.UserRepository;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.RefreshTokenRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.PartialAuthSession;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.RefreshToken;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.Role;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.User;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.entity.UserStatus;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.EmailVerificationTokenRepository;
-import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.PartialAuthSessionRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.PasswordResetTokenRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.RefreshTokenRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.RoleRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.repository.UserRepository;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.security.JwtService;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AppProperties;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
+import id.ac.ui.cs.advprog.bidmart.common.event.UserRoleChangedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.UserSuspendedEvent;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationEvent;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -27,15 +54,46 @@ public class AuthService {
 
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
+    private final RoleRepository roles;
     private final EmailVerificationTokenRepository verificationTokens;
     private final PasswordResetTokenRepository resetTokens;
+    private final PartialAuthSessionRepository partialAuthSessions;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final TotpService totpService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final JwtService jwtService;
     private final EmailService emailService;
     private final AuthProperties authProps;
     private final AppProperties appProps;
 
+    @Autowired
+    public AuthService(UserRepository users,
+                       RefreshTokenRepository refreshTokens,
+                       RoleRepository roles,
+                       EmailVerificationTokenRepository verificationTokens,
+                       PasswordResetTokenRepository resetTokens,
+                       PartialAuthSessionRepository partialAuthSessions,
+                       AuthProperties authProps,
+                       AppProperties appProps,
+                       EmailService emailService,
+                       TotpService totpService,
+                       ApplicationEventPublisher eventPublisher) {
+        this.users = users;
+        this.refreshTokens = refreshTokens;
+        this.roles = roles;
+        this.verificationTokens = verificationTokens;
+        this.resetTokens = resetTokens;
+        this.partialAuthSessions = partialAuthSessions;
+        this.authProps = authProps;
+        this.appProps = appProps;
+        this.jwtService = new JwtService(authProps);
+        this.emailService = emailService;
+        this.totpService = totpService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    // Backward-compatible constructor for older tests.
     public AuthService(UserRepository users,
                        RefreshTokenRepository refreshTokens,
                        EmailVerificationTokenRepository verificationTokens,
@@ -43,14 +101,27 @@ public class AuthService {
                        AuthProperties authProps,
                        AppProperties appProps,
                        EmailService emailService) {
-        this.users = users;
-        this.refreshTokens = refreshTokens;
-        this.verificationTokens = verificationTokens;
-        this.resetTokens = resetTokens;
-        this.authProps = authProps;
-        this.appProps = appProps;
-        this.jwtService = new JwtService(authProps);
-        this.emailService = emailService;
+        this(users,
+                refreshTokens,
+            null,
+                verificationTokens,
+                resetTokens,
+                null,
+                authProps,
+                appProps,
+                emailService,
+                new TotpService(),
+                new ApplicationEventPublisher() {
+                    @Override
+                    public void publishEvent(Object event) {
+                        // no-op for legacy tests
+                    }
+
+                    @Override
+                    public void publishEvent(ApplicationEvent event) {
+                        // no-op for legacy tests
+                    }
+                });
     }
 
     @Transactional
@@ -74,22 +145,25 @@ public class AuthService {
                 throw new IllegalArgumentException("Email already registered");
             }
 
-            u.setPasswordHash(passwordEncoder.encode(rawPassword));
-            u.setDisplayName(displayName);
+            u.setPasswordHash(passwordEncoder.encode(request.password));
+            u.setDisplayName(request.displayName);
             users.save(u);
 
             sendVerificationProcedure(u);
-            return;
+            return toUserResponse(u);
         }
 
         User u = new User();
         u.setEmail(normalized);
-        u.setPasswordHash(passwordEncoder.encode(rawPassword));
-        u.setDisplayName(displayName);
-        u.setEmailVerified(true);
+        u.setPasswordHash(passwordEncoder.encode(request.password));
+        u.setDisplayName(request.displayName);
+        u.setEmailVerified(false);
+        u.setRolesList(List.of("BUYER", "SELLER"));
+        u.setStatus(UserStatus.ACTIVE);
         users.save(u);
 
         sendVerificationProcedure(u);
+        return toUserResponse(u);
     }
 
     private void sendVerificationProcedure(User u) {
@@ -140,6 +214,9 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password, u.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
+        if (u.getStatus() == UserStatus.SUSPENDED) {
+            throw new IllegalStateException("Account suspended");
+        }
         if (!u.isEmailVerified()) {
             throw new IllegalStateException("Email not verified");
         }
@@ -153,14 +230,24 @@ public class AuthService {
 
     @Transactional
     public AuthResponse refresh(String refreshToken) {
-        RefreshToken rt = refreshTokens.findByToken(refreshToken).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        LoginSuccessResponseDTO refreshed = refreshWithDesign(refreshToken);
+        return new AuthResponse(refreshed.accessToken, refreshed.refreshToken);
+    }
+
+    @Transactional
+    public LoginSuccessResponseDTO refreshWithDesign(String refreshToken) {
+        RefreshToken rt = refreshTokens.findByToken(refreshToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
 
         if (rt.isRevoked()) throw new IllegalArgumentException("Refresh token revoked");
         if (rt.getExpiresAt().isBefore(Instant.now())) throw new IllegalArgumentException("Refresh token expired");
 
         User u = rt.getUser();
-        String accessToken = jwtService.generateAccessToken(u.getId(), u.getEmail());
-        return new AuthResponse(accessToken, refreshToken);
+        rt.setLastActive(Instant.now());
+        refreshTokens.save(rt);
+
+        String accessToken = jwtService.generateAccessToken(u.getId(), u.getEmail(), rt.getId(), u.getRolesList());
+        return new LoginSuccessResponseDTO(accessToken, refreshToken, authProps.getAccessTokenExpiration() / 1000, toUserResponse(u));
     }
 
     @Transactional
@@ -168,6 +255,230 @@ public class AuthService {
         RefreshToken rt = refreshTokens.findByToken(refreshToken).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
         rt.setRevoked(true);
         refreshTokens.save(rt);
+    }
+
+    @Transactional
+    public LoginSuccessResponseDTO verifyTwoFactor(TwoFactorVerifyRequestDTO request, HttpServletRequest servletRequest) {
+        PartialAuthSession partial = partialAuthSessions.findByPartialToken(request.partialToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid partial token"));
+
+        if (partial.isUsed()) {
+            throw new IllegalArgumentException("Partial token already used");
+        }
+        if (partial.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Partial token expired");
+        }
+
+        User user = partial.getUser();
+        String method = request.method.trim().toUpperCase(Locale.ROOT);
+
+        if (!supportsMethod(partial.getMethods(), method)) {
+            throw new IllegalArgumentException("Unsupported 2FA method");
+        }
+
+        boolean verified;
+        if ("TOTP".equals(method)) {
+            verified = totpService.verifyCode(user.getTwoFactorSecret(), request.code);
+        } else if ("EMAIL".equals(method)) {
+            Instant codeExpiry = partial.getEmailOtpExpiresAt();
+            if (codeExpiry == null || codeExpiry.isBefore(Instant.now())) {
+                throw new IllegalArgumentException("2FA code expired");
+            }
+            String otpHash = partial.getEmailOtpHash();
+            verified = otpHash != null && passwordEncoder.matches(request.code, otpHash);
+        } else {
+            throw new IllegalArgumentException("Unsupported 2FA method");
+        }
+
+        if (!verified) {
+            throw new IllegalArgumentException("Invalid 2FA code");
+        }
+
+        partial.setUsed(true);
+        partialAuthSessions.save(partial);
+
+        return createLoginSuccess(user, servletRequest);
+    }
+
+    @Transactional
+    public TwoFactorSetupResponseDTO setupTwoFactor(User user, String method) {
+        if ("EMAIL".equalsIgnoreCase(method)) {
+            user.setTwoFactorEnabled(true);
+            user.setTwoFactorMethod("EMAIL");
+            user.setTwoFactorSecret(null);
+            user.setTwoFactorTempSecret(null);
+            user.setTwoFactorBackupCodes(null);
+            users.save(user);
+            return new TwoFactorSetupResponseDTO(null, null, List.of());
+        }
+
+        if (!"TOTP".equalsIgnoreCase(method)) {
+            throw new IllegalArgumentException("Only TOTP or EMAIL is supported");
+        }
+
+        String secret = totpService.generateBase32Secret();
+        List<String> backupCodes = generateBackupCodes();
+
+        user.setTwoFactorTempSecret(secret);
+        user.setTwoFactorBackupCodes(String.join(",", backupCodes));
+        user.setTwoFactorMethod("TOTP");
+        users.save(user);
+
+        return new TwoFactorSetupResponseDTO(secret, null, backupCodes);
+    }
+
+    @Transactional
+    public void confirmTwoFactor(User user, String code) {
+        String tempSecret = user.getTwoFactorTempSecret();
+        if (tempSecret == null || tempSecret.isBlank()) {
+            throw new IllegalArgumentException("2FA setup has not been started");
+        }
+
+        if (!totpService.verifyCode(tempSecret, code)) {
+            throw new IllegalArgumentException("Invalid 2FA code");
+        }
+
+        user.setTwoFactorSecret(tempSecret);
+        user.setTwoFactorTempSecret(null);
+        user.setTwoFactorEnabled(true);
+        user.setTwoFactorMethod("TOTP");
+        users.save(user);
+    }
+
+    @Transactional
+    public void disableTwoFactor(User user, String password) {
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Invalid password");
+        }
+        user.setTwoFactorEnabled(false);
+        user.setTwoFactorSecret(null);
+        user.setTwoFactorTempSecret(null);
+        user.setTwoFactorBackupCodes(null);
+        user.setTwoFactorMethod(null);
+        users.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponseDTO> getActiveSessions(User user, String currentSessionId) {
+        List<RefreshToken> sessions = refreshTokens.findByUserAndRevokedFalseOrderByCreatedAtDesc(user);
+        return sessions.stream()
+                .map(s -> new SessionResponseDTO(
+                        s.getId(),
+                        s.getDevice(),
+                        s.getIpAddress(),
+                        s.getLastActive(),
+                        currentSessionId != null && currentSessionId.equals(s.getId().toString())
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public void revokeSession(User user, UUID sessionId) {
+        RefreshToken session = refreshTokens.findByIdAndUser(sessionId, user)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+        session.setRevoked(true);
+        refreshTokens.save(session);
+    }
+
+    @Transactional
+    public void changePassword(User user, ChangePasswordRequestDTO request) {
+        if (!passwordEncoder.matches(request.currentPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password invalid");
+        }
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword));
+        users.save(user);
+    }
+
+    @Transactional
+    public User updateProfile(User user, String displayName, String avatarUrl) {
+        user.setDisplayName(displayName);
+        user.setAvatarUrl(avatarUrl);
+        return users.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponseDTO> adminListUsers(String search, String role, String status, int page, int size) {
+        UserStatus filterStatus = null;
+        if (status != null && !status.isBlank()) {
+            filterStatus = UserStatus.valueOf(status.toUpperCase(Locale.ROOT));
+        }
+
+        List<User> candidates = users.searchUsers(search, filterStatus);
+        List<User> filtered = candidates.stream()
+                .filter(u -> role == null || role.isBlank() || u.getRolesList().contains(role.toUpperCase(Locale.ROOT)))
+                .sorted(Comparator.comparing(User::getCreatedAt).reversed())
+                .collect(Collectors.toList());
+
+        int from = Math.min(page * size, filtered.size());
+        int to = Math.min(from + size, filtered.size());
+        return filtered.subList(from, to).stream().map(this::toUserResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponseDTO adminGetUser(UUID userId) {
+        return toUserResponse(getUserById(userId));
+    }
+
+    @Transactional
+    public UserResponseDTO adminUpdateUserStatus(UUID userId, String status, String reason) {
+        User user = getUserById(userId);
+        UserStatus newStatus = UserStatus.valueOf(status.toUpperCase(Locale.ROOT));
+        user.setStatus(newStatus);
+        users.save(user);
+
+        if (newStatus == UserStatus.SUSPENDED) {
+            eventPublisher.publishEvent(new UserSuspendedEvent(user.getId(), reason, Instant.now()));
+            refreshTokens.revokeAllByUser(user);
+        }
+
+        return toUserResponse(user);
+    }
+
+    @Transactional
+    public UserResponseDTO adminUpdateUserRoles(UUID userId, List<String> roles) {
+        User user = getUserById(userId);
+        user.setRolesList(roles);
+        users.save(user);
+        eventPublisher.publishEvent(new UserRoleChangedEvent(user.getId(), user.getRolesList(), Instant.now()));
+        return toUserResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoleResponseDTO> adminListRoles() {
+        if (roles == null) {
+            return List.of();
+        }
+        return roles.findAll().stream()
+                .map(this::toRoleResponse)
+                .toList();
+    }
+
+    @Transactional
+    public RoleResponseDTO adminCreateRole(RoleRequestDTO req) {
+        if (roles == null) {
+            throw new IllegalStateException("Role repository unavailable");
+        }
+        if (roles.findByNameIgnoreCase(req.name).isPresent()) {
+            throw new IllegalArgumentException("Role already exists");
+        }
+
+        Role role = new Role();
+        role.setName(req.name.trim().toUpperCase(Locale.ROOT));
+        role.setPermissions(String.join(",", req.permissions));
+        roles.save(role);
+        return toRoleResponse(role);
+    }
+
+    @Transactional
+    public RoleResponseDTO adminUpdateRole(UUID roleId, RoleRequestDTO req) {
+        if (roles == null) {
+            throw new IllegalStateException("Role repository unavailable");
+        }
+        Role role = roles.findById(roleId).orElseThrow(() -> new IllegalArgumentException("Role not found"));
+        role.setName(req.name.trim().toUpperCase(Locale.ROOT));
+        role.setPermissions(String.join(",", req.permissions));
+        roles.save(role);
+        return toRoleResponse(role);
     }
 
     private static String generateRefreshToken() {
@@ -189,7 +500,7 @@ public class AuthService {
         t.setExpiresAt(Instant.now().plusSeconds(3600)); // expired in 1 hour
         resetTokens.save(t);
 
-        String link = appProps.getBaseUrl() + "/auth/reset?token=" + t.getToken();
+        String link = buildFrontendLink("/auth/reset", t.getToken());
         emailService.sendResetPasswordEmail(u.getEmail(), link);
     }
 
