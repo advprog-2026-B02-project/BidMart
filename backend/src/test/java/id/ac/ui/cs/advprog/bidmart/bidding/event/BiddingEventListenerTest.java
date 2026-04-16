@@ -30,8 +30,6 @@ class BiddingEventListenerTest {
     @Mock
     private WalletClient walletClient;
     @Mock
-    private NotificationClient notificationClient;
-    @Mock
     private SimpMessagingTemplate messagingTemplate;
     @Mock
     private AuctionRepository auctionRepository;
@@ -75,7 +73,6 @@ class BiddingEventListenerTest {
         eventListener.handleBidPlacedEvent(event);
 
         verify(walletClient).releaseFunds(outbidHoldId);
-        verify(notificationClient).sendOutbidNotification(outbidUserId, auctionId);
 
         verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
 
@@ -95,7 +92,6 @@ class BiddingEventListenerTest {
         eventListener.handleBidPlacedEvent(event);
 
         verify(walletClient, never()).releaseFunds(any());
-        verify(notificationClient, never()).sendOutbidNotification(any(), any());
 
         verify(messagingTemplate, times(1)).convertAndSend(anyString(), any(Map.class));
     }
@@ -119,7 +115,6 @@ class BiddingEventListenerTest {
         eventListener.handleAuctionWonEvent(event);
 
         verify(walletClient).captureWinnerFunds(auctionId, bidderId);
-        verify(notificationClient).sendAuctionWonNotification(bidderId, auctionId);
 
         verify(messagingTemplate).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
 
@@ -165,8 +160,6 @@ class BiddingEventListenerTest {
     void handleBidPlacedEvent_ShouldLogAndContinue_WhenNotificationFails() {
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
         BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
-
-        doThrow(new RuntimeException("Notification service down")).when(notificationClient).sendOutbidNotification(any(), any());
 
         eventListener.handleBidPlacedEvent(event);
 

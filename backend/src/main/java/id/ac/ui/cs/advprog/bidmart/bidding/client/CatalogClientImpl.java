@@ -14,7 +14,6 @@ public class CatalogClientImpl implements CatalogClient {
 
     @Override
     public void validateListing(UUID listingId) {
-        // panggil method validasi yang udah disediain temen lu
         listingService.validateListingForBid(listingId);
     }
 }
