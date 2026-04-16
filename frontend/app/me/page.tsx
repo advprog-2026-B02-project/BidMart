@@ -105,6 +105,14 @@ export default function MePage() {
                     </button>
 
                     <button
+                        onClick={() => router.push("/me/2fa")}
+                        className="w-full rounded-xl py-4 text-lg font-bold text-[#002447] bg-[#002447]/10 hover:bg-[#002447]/20 transition-all shadow-sm active:scale-[0.98]"
+                        disabled={!!msg}
+                    >
+                        Kelola 2FA
+                    </button>
+
+                    <button
                         onClick={onLogout}
                         className="w-full rounded-xl py-4 text-lg font-bold text-white bg-red-600 hover:bg-red-700 transition-all shadow-md active:scale-[0.98]"
                     >

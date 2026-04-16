@@ -5,6 +5,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -12,10 +14,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
+@Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
 
@@ -30,8 +36,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return uri.equals("/auth/register")
                 || uri.equals("/auth/login")
                 || uri.equals("/auth/verify")
+                || uri.equals("/auth/verify-email")
                 || uri.equals("/auth/refresh")
-                || uri.equals("/health");
+                || uri.equals("/auth/2fa/verify")
+                || uri.equals("/health")
+                || uri.startsWith("/ws"); // menambahkan bypass filter untuk endpoint websocket
     }
 
     @Override
@@ -52,20 +61,40 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         try {
             var claims = jwtService.parseClaims(token);
 
-            Long userId = Long.valueOf(claims.getSubject()); // read userId from subject
+            UUID userId = UUID.fromString(claims.getSubject());
             String email = claims.get("email", String.class);
+            String sessionId = claims.get("sid", String.class);
+
+            List<String> roles = new ArrayList<>();
+            Object rawRoles = claims.get("roles");
+            if (rawRoles instanceof List<?>) {
+                for (Object r : (List<?>) rawRoles) {
+                    if (r != null) {
+                        roles.add(r.toString());
+                    }
+                }
+            }
 
             Map<String, Object> principal = Map.of(
                     "userId", userId,
-                    "email", email
+                    "email", email,
+                    "sessionId", sessionId == null ? "" : sessionId,
+                    "roles", roles
             );
 
-            var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
+            List<SimpleGrantedAuthority> authorities = roles.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
+                    .toList();
+
+            var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(auth);
 
         } catch (Exception e) {
-            System.out.println("JWT Parsing Error: " + e.getMessage());
+            log.error("JWT Parsing Error: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         }
 

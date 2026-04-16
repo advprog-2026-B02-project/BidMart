@@ -1,11 +1,16 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.security;
 
-import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
-import io.jsonwebtoken.Claims;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.config.AuthProperties;
+import io.jsonwebtoken.Claims;
 
 class JwtServiceTest {
 
@@ -21,12 +26,13 @@ class JwtServiceTest {
 
     @Test
     void testGenerateAndValidate() {
-        String token = jwtService.generateAccessToken(123L, "test@test.com");
+        UUID userId = UUID.randomUUID();
+        String token = jwtService.generateAccessToken(userId, "test@test.com");
         assertNotNull(token);
         assertTrue(jwtService.isValid(token));
 
         Claims claims = jwtService.parseClaims(token);
-        assertEquals("123", claims.getSubject());
+        assertEquals(userId.toString(), claims.getSubject());
         assertEquals("test@test.com", claims.get("email"));
     }
 
