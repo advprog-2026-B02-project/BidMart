@@ -55,7 +55,16 @@ public class AuthService {
 
     @Transactional
     public void register(String email, String rawPassword, String displayName) {
-        String normalized = email.toLowerCase().trim();
+        RegisterRequestDTO request = new RegisterRequestDTO();
+        request.email = email;
+        request.password = rawPassword;
+        request.displayName = displayName;
+        registerAndReturn(request);
+    }
+
+    @Transactional
+    public UserResponseDTO registerAndReturn(RegisterRequestDTO request) {
+        String normalized = request.email.toLowerCase().trim();
 
         Optional<User> existingUser = users.findByEmail(normalized);
 
@@ -94,7 +103,7 @@ public class AuthService {
         t.setExpiresAt(Instant.now().plusSeconds(60 * 60 * 24));
         verificationTokens.save(t);
 
-        String link = appProps.getBaseUrl() + "/auth/verify?token=" + t.getToken();
+        String link = buildFrontendLink("/auth/verify", t.getToken());
         emailService.sendVerificationEmail(u.getEmail(), link);
     }
 
@@ -117,7 +126,12 @@ public class AuthService {
     public AuthResponse login(String email, String rawPassword) {
         User u = users.findByEmail(email.toLowerCase().trim()).orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
-        if (!passwordEncoder.matches(rawPassword, u.getPasswordHash())) {
+    @Transactional
+    public Object loginWithDesign(LoginRequestDTO request, HttpServletRequest servletRequest) {
+        User u = users.findByEmail(request.email.toLowerCase().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+
+        if (!passwordEncoder.matches(request.password, u.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
         if (!u.isEmailVerified()) {
@@ -177,6 +191,14 @@ public class AuthService {
 
         String link = appProps.getBaseUrl() + "/auth/reset?token=" + t.getToken();
         emailService.sendResetPasswordEmail(u.getEmail(), link);
+    }
+
+    private String buildFrontendLink(String path, String token) {
+        String frontend = appProps.getFrontendUrl();
+        if (frontend == null || frontend.isBlank()) {
+            frontend = "http://localhost:3000";
+        }
+        return frontend + path + "?token=" + token;
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmart.backend.auth.controller;
 
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginRequest;
+import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.LoginRequestDTO;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RefreshRequest;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.bidmart.backend.auth.service.AuthService;
@@ -20,16 +21,21 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Void> register(@Valid @RequestBody RegisterRequest req) {
-        System.out.println("[HIT] /auth/register");
-        auth.register(req.email, req.password, req.displayName);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<UserResponseDTO> register(@Valid @RequestBody RegisterRequestDTO req) {
+        UserResponseDTO response = auth.registerAndReturn(req);
+        return ResponseEntity.status(201).body(response);
     }
 
     @GetMapping("/verify")
     public ResponseEntity<String> verify(@RequestParam("token") String token) {
         auth.verifyEmail(token);
         return ResponseEntity.ok("Email berhasil diverifikasi. Silakan login.");
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@Valid @RequestBody VerifyEmailRequestDTO req) {
+        auth.verifyEmail(req.token);
+        return ResponseEntity.ok(Map.of("message", "Email verified"));
     }
 
     @PostMapping("/login")

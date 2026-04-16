@@ -1,5 +1,23 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
+type PartialLoginResponse = {
+    partialToken: string;
+    requires2FA: boolean;
+    methods: string[];
+    expiresIn: number;
+};
+
+type LoginSuccessResponse = {
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    user?: unknown;
+};
+
+function isPartialLoginResponse(data: any): data is PartialLoginResponse {
+    return Boolean(data?.requires2FA && data?.partialToken);
+}
+
 async function parseError(res: Response | null) {
     if (!res || res.status === 0) {
         return "Gagal terhubung ke server. Pastikan koneksi internet aktif.";
@@ -123,11 +141,47 @@ export async function login(email: string, password: string) {
         }
 
         const data = await res.json();
+        if (isPartialLoginResponse(data)) {
+            return data;
+        }
+
         const accessToken = data?.accessToken ?? data?.token ?? data?.jwt;
         const refreshToken = data?.refreshToken;
 
         if (!accessToken) {
             throw new Error("Login berhasil, tapi token tidak ditemukan.");
+        }
+
+        setTokens(accessToken, refreshToken);
+        return data;
+    } catch (err: any) {
+        if (!(err instanceof Error) || err.message === "Failed to fetch") {
+            const cleanMsg = await parseError(null);
+            throw new Error(cleanMsg);
+        }
+        throw err;
+    }
+}
+
+export async function verifyTwoFactor(partialToken: string, method: string, code: string): Promise<LoginSuccessResponse> {
+    try {
+        const res = await fetch(`${BASE_URL}/auth/2fa/verify`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({partialToken, method, code}),
+        });
+
+        if (!res.ok) {
+            const message = await parseError(res);
+            throw new Error(message);
+        }
+
+        const data = await res.json();
+        const accessToken = data?.accessToken ?? data?.token ?? data?.jwt;
+        const refreshToken = data?.refreshToken;
+
+        if (!accessToken) {
+            throw new Error("Verifikasi 2FA berhasil, tapi token tidak ditemukan.");
         }
 
         setTokens(accessToken, refreshToken);
