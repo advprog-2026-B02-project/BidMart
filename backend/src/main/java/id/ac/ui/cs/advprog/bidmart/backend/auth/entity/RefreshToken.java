@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "refresh_tokens", indexes = {
@@ -13,8 +14,8 @@ import java.time.Instant;
 public class RefreshToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Setter
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -33,10 +34,22 @@ public class RefreshToken {
     @Column(nullable = false)
     private boolean revoked = false;
 
+    @Setter
+    @Column(name = "device", length = 200)
+    private String device;
+
+    @Setter
+    @Column(name = "ip_address", length = 64)
+    private String ipAddress;
+
+    @Setter
+    @Column(name = "last_active", nullable = false, columnDefinition = "timestamp with time zone default now()")
+    private Instant lastActive = Instant.now();
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
-    public Long getId() { return id; }
+    public UUID getId() { return id; }
 
     public User getUser() { return user; }
 
@@ -45,6 +58,12 @@ public class RefreshToken {
     public Instant getExpiresAt() { return expiresAt; }
 
     public boolean isRevoked() { return revoked; }
+
+    public String getDevice() { return device; }
+
+    public String getIpAddress() { return ipAddress; }
+
+    public Instant getLastActive() { return lastActive; }
 
     public Instant getCreatedAt() { return createdAt; }
 }

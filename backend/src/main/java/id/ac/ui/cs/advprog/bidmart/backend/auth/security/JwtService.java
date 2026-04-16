@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 
 public class JwtService {
     private final AuthProperties props;
@@ -20,15 +22,26 @@ public class JwtService {
         this.key = Keys.hmacShaKeyFor(props.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Long userId, String email) {
+    public String generateAccessToken(UUID userId, String email) {
+        return generateAccessToken(userId, email, null, List.of());
+    }
+
+    public String generateAccessToken(UUID userId, String email, UUID sessionId, List<String> roles) {
         Instant now = Instant.now();
         Instant exp = now.plusMillis(props.getAccessTokenExpiration());
 
-        return Jwts.builder()
-                .subject(String.valueOf(userId))   // store userId in subject
-                .claim("email", email)            // store email as claim
+        var builder = Jwts.builder()
+                .subject(String.valueOf(userId))
+                .claim("email", email)
+                .claim("roles", roles)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(exp))
+                .expiration(Date.from(exp));
+
+        if (sessionId != null) {
+            builder.claim("sid", sessionId.toString());
+        }
+
+        return builder
                 .signWith(key)
                 .compact();
     }
