@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.service;
 
+import id.ac.ui.cs.advprog.bidmart.bidding.client.CatalogClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.dto.*;
 import id.ac.ui.cs.advprog.bidmart.bidding.event.AuctionUnsoldEvent;
@@ -44,6 +45,8 @@ class BiddingServiceImplTest {
     private WalletClient walletClient;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private CatalogClient catalogClient;
 
     @InjectMocks
     private BiddingServiceImpl biddingService;
@@ -252,6 +255,8 @@ class BiddingServiceImplTest {
         request.setMinimumIncrement(new BigDecimal("10000"));
         request.setReservePrice(new BigDecimal("500000"));
         request.setEndTime(LocalDateTime.now().plusDays(1));
+
+        doNothing().when(catalogClient).validateListing(any(UUID.class));
 
         when(auctionRepository.save(any(Auction.class))).thenAnswer(i -> i.getArguments()[0]);
 
