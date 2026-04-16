@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.event;
 
-import id.ac.ui.cs.advprog.bidmart.bidding.client.NotificationClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Auction;
 import id.ac.ui.cs.advprog.bidmart.bidding.repository.AuctionRepository;
