@@ -89,4 +89,14 @@ public class BiddingController {
         AuctionResultDTO response = biddingService.getAuctionResult(auctionId);
         return ResponseEntity.ok(response);
     }
+
+    // melihat semua riwayat penawaran milik user yang sedang login
+    @GetMapping("/my-bids")
+    public ResponseEntity<Page<BidResponseDTO>> getMyBids(
+            @RequestHeader("X-User-Id") UUID userId,
+            Pageable pageable
+    ) {
+        Page<BidResponseDTO> response = biddingService.getUserBids(userId, pageable);
+        return ResponseEntity.ok(response);
+    }
 }

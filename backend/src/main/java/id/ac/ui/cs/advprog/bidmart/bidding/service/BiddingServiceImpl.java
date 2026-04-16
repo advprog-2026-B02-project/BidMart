@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.service;
 
+import id.ac.ui.cs.advprog.bidmart.bidding.client.CatalogClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.dto.BidRequestDTO;
 import id.ac.ui.cs.advprog.bidmart.bidding.dto.BidResponseDTO;
@@ -33,6 +34,7 @@ public class BiddingServiceImpl implements BiddingService {
     private final BidRepository bidRepository;
     private final WalletClient walletClient;
     private final ApplicationEventPublisher eventPublisher;
+    private final CatalogClient catalogClient;
 
     private static final String AUCTION_NOT_FOUND_MSG = "lelang tidak ditemukan";
 
@@ -206,6 +208,9 @@ public class BiddingServiceImpl implements BiddingService {
     @Override
     @Transactional
     public AuctionResponseDTO startAuction(UUID listingId, AuctionStartRequestDTO request) {
+        // cek barang valid atau gk
+        catalogClient.validateListing(listingId);
+
         LocalDateTime now = LocalDateTime.now();
 
         Auction auction = new Auction();
@@ -288,5 +293,25 @@ public class BiddingServiceImpl implements BiddingService {
 
             auctionRepository.save(auction);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BidResponseDTO> getUserBids(UUID userId, Pageable pageable) {
+        // ambil data mentah dari database
+        Page<Bid> userBids = bidRepository.findByBidderId(userId, pageable);
+
+        // konversi entity bid menjadi bentuk dto
+        return userBids.map(bid -> BidResponseDTO.builder()
+                .id(bid.getId())
+                .auctionId(bid.getAuction().getId())
+                .bidderId(bid.getBidderId())
+                .amount(bid.getAmount())
+                .status(bid.getStatus().name())
+                .holdId(bid.getHoldId())
+                .isNewHighBid(false) // karena ini riwayat, kita default ke false
+                .auctionEndTime(bid.getAuction().getEndTime()) // ambil dari relasi auction
+                .createdAt(bid.getCreatedAt())
+                .build());
     }
 }

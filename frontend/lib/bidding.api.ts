@@ -116,3 +116,25 @@ export async function startAuction(listingId: string, payload: {
     if (!res.ok) throw new Error("gagal memulai lelang");
     return res.json();
 }
+
+export const getMyBids = async (userId: string, token: string) => {
+    // Sesuaikan BASE_URL dengan yang lu pake
+    const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
+    const res = await fetch(`${BASE_URL}/auctions/my-bids?page=0&size=20`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+            "X-User-Id": userId // Sesuai dengan @RequestHeader di controller lu
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error("Gagal mengambil riwayat penawaran");
+    }
+
+    const data = await res.json();
+
+    return data.content as BidResponseDTO[];
+};

@@ -17,4 +17,5 @@ public interface BiddingService {
     Page<BidResponseDTO> getBidHistory(UUID auctionId, Pageable pageable);
     AuctionResultDTO getAuctionResult(UUID auctionId);
     void closeExpiredAuctions();
+    Page<BidResponseDTO> getUserBids(UUID userId, Pageable pageable);
 }

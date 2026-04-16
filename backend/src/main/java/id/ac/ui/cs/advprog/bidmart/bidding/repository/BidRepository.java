@@ -9,5 +9,5 @@ import java.util.UUID;
 
 public interface BidRepository extends JpaRepository<Bid, UUID> {
     Page<Bid> findByAuctionIdOrderByAmountDesc(UUID auctionId, Pageable pageable);
-    long countByAuctionId(UUID auctionId);
+    Page<Bid> findByBidderId(UUID bidderId, Pageable pageable);
 }
