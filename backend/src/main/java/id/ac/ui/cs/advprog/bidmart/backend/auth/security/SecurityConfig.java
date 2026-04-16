@@ -37,15 +37,16 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/refresh", "/auth/verify-email", "/auth/2fa/verify").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/auth/verify").permitAll()
-                    .requestMatchers("/health", "/api/counter/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/refresh", "/auth/verify-email", "/auth/2fa/verify").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/verify").permitAll()
+                        // membuka akses handshake websocket
+                        .requestMatchers("/health", "/api/counter/**", "/ws/**", "/api/bidding/**", "/api/notifications/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/me").authenticated()
-                    .requestMatchers("/users/me/**").authenticated()
-                    .requestMatchers("/auth/2fa/**").authenticated()
-                    .requestMatchers("/admin/**").hasRole("ADMIN")
-                    .anyRequest().authenticated()
+                        .requestMatchers("/users/me/**").authenticated()
+                        .requestMatchers("/auth/2fa/**").authenticated()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

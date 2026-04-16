@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Component
+@Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
 
@@ -34,10 +36,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return uri.equals("/auth/register")
                 || uri.equals("/auth/login")
                 || uri.equals("/auth/verify")
-            || uri.equals("/auth/verify-email")
+                || uri.equals("/auth/verify-email")
                 || uri.equals("/auth/refresh")
-            || uri.equals("/auth/2fa/verify")
-                || uri.equals("/health");
+                || uri.equals("/auth/2fa/verify")
+                || uri.equals("/health")
+                || uri.startsWith("/ws"); // menambahkan bypass filter untuk endpoint websocket
     }
 
     @Override
@@ -58,7 +61,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         try {
             var claims = jwtService.parseClaims(token);
 
-            UUID userId = UUID.fromString(claims.getSubject()); // read userId from subject as UUID
+            UUID userId = UUID.fromString(claims.getSubject());
             String email = claims.get("email", String.class);
             String sessionId = claims.get("sid", String.class);
 
@@ -91,7 +94,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
 
         } catch (Exception e) {
-            System.out.println("JWT Parsing Error: " + e.getMessage());
+            log.error("JWT Parsing Error: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         }
 
