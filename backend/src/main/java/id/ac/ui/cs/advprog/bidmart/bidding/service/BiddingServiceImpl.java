@@ -2,11 +2,9 @@ package id.ac.ui.cs.advprog.bidmart.bidding.service;
 
 import id.ac.ui.cs.advprog.bidmart.bidding.client.CatalogClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
-import id.ac.ui.cs.advprog.bidmart.bidding.dto.BidRequestDTO;
-import id.ac.ui.cs.advprog.bidmart.bidding.dto.BidResponseDTO;
-import id.ac.ui.cs.advprog.bidmart.bidding.event.AuctionUnsoldEvent;
-import id.ac.ui.cs.advprog.bidmart.bidding.event.AuctionWonEvent;
-import id.ac.ui.cs.advprog.bidmart.bidding.event.BidPlacedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.BidPlacedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.WinnerDeterminedEvent;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Auction;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.AuctionStatus;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Bid;
@@ -127,11 +125,14 @@ public class BiddingServiceImpl implements BiddingService {
         newBid.setCreatedAt(now);
         newBid = bidRepository.save(newBid);
 
+        // get seller id for event
+        UUID sellerId = catalogClient.getSellerId(auction.getListingId());
+
         // broadcast event outbid untuk penawar lama kalau ada
         if (previousBidderId != null) {
-            eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), bidderId, newCurrentPrice, previousBidderId, outbidHoldId));
+            eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), sellerId, bidderId, newCurrentPrice, previousBidderId, outbidHoldId));
         } else {
-            eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), bidderId, newCurrentPrice, null, null));
+            eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), sellerId, bidderId, newCurrentPrice, null, null));
         }
 
         return newBid;
@@ -168,8 +169,11 @@ public class BiddingServiceImpl implements BiddingService {
 
         // penawar lama ga perlu ditahan dananya lagi karena dari awal udah ditahan full max
 
+        // get seller id for event
+        UUID sellerId = catalogClient.getSellerId(auction.getListingId());
+
         // broadcast update harga baru ke websocket (tanpa outbid id karena pemenangnya tetep sama)
-        eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), auction.getHighestBidderId(), newCurrentPrice, null, null));
+        eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), sellerId, auction.getHighestBidderId(), newCurrentPrice, null, null));
 
         return newBid;
     }
@@ -278,7 +282,7 @@ public class BiddingServiceImpl implements BiddingService {
                 auction.setReserveMet(true);
 
                 // publish event lelang dimenangkan agar modul wallet memotong dana pemenang
-                eventPublisher.publishEvent(new AuctionWonEvent(
+                eventPublisher.publishEvent(new WinnerDeterminedEvent(
                         auction.getId(),
                         auction.getHighestBidderId(),
                         auction.getCurrentPrice()
@@ -287,8 +291,11 @@ public class BiddingServiceImpl implements BiddingService {
                 auction.setStatus(AuctionStatus.UNSOLD);
                 auction.setReserveMet(false);
 
+                // get seller id for event
+                UUID sellerId = catalogClient.getSellerId(auction.getListingId());
+
                 // publish event lelang gagal agar modul wallet melepas dana penawar tertinggi
-                eventPublisher.publishEvent(new AuctionUnsoldEvent(auction.getId()));
+                eventPublisher.publishEvent(new AuctionUnsoldEvent(auction.getId(), sellerId));
             }
 
             auctionRepository.save(auction);

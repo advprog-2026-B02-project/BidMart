@@ -2,6 +2,9 @@ package id.ac.ui.cs.advprog.bidmart.bidding.event;
 
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.repository.AuctionRepository;
+import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.BidPlacedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.WinnerDeterminedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -78,7 +81,7 @@ public class BiddingEventListener {
 
     @Async
     @EventListener
-    public void handleAuctionWonEvent(AuctionWonEvent event) {
+    public void handleWinnerDeterminedEvent(WinnerDeterminedEvent event) {
         try {
             walletClient.captureWinnerFunds(event.auctionId(), event.winnerId());
 

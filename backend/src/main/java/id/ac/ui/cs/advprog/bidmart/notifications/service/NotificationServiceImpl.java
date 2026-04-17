@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -114,7 +115,7 @@ public class NotificationServiceImpl implements NotificationService {
         Map<String, Object> dataMap = null;
         if (notification.getData() != null) {
             try {
-                dataMap = objectMapper.readValue(notification.getData(), Map.class);
+                dataMap = objectMapper.readValue(notification.getData(), new TypeReference<Map<String, Object>>() {});
             } catch (JsonProcessingException e) {
                 dataMap = null;
             }
