@@ -16,4 +16,9 @@ public class CatalogClientImpl implements CatalogClient {
     public void validateListing(UUID listingId) {
         listingService.validateListingForBid(listingId);
     }
+
+    @Override
+    public UUID getSellerId(UUID listingId) {
+        return listingService.findDetailById(listingId).getSellerId();
+    }
 }
