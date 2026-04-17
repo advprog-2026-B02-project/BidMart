@@ -3,6 +3,9 @@ package id.ac.ui.cs.advprog.bidmart.bidding.event;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Auction;
 import id.ac.ui.cs.advprog.bidmart.bidding.repository.AuctionRepository;
+import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.BidPlacedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.WinnerDeterminedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -68,7 +72,8 @@ class BiddingEventListenerTest {
         auction.setExtensionCount(1);
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
 
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
+        UUID sellerId = UUID.randomUUID();
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
 
         eventListener.handleBidPlacedEvent(event);
 
@@ -87,7 +92,8 @@ class BiddingEventListenerTest {
     void handleBidPlacedEvent_Success_NoOutbidNoExtension() {
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
 
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("100000"), null, null);
+        UUID sellerId = UUID.randomUUID();
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("100000"), null, null);
 
         eventListener.handleBidPlacedEvent(event);
 
@@ -98,7 +104,8 @@ class BiddingEventListenerTest {
 
     @Test
     void handleBidPlacedEvent_CatchException_WhenWalletFails() {
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
+        UUID sellerId = UUID.randomUUID();
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
 
         doThrow(new RuntimeException("Wallet Error")).when(walletClient).releaseFunds(any());
@@ -109,10 +116,9 @@ class BiddingEventListenerTest {
     }
 
     @Test
-    void handleAuctionWonEvent_Success() {
-        AuctionWonEvent event = new AuctionWonEvent(auctionId, bidderId, new BigDecimal("500000"));
-
-        eventListener.handleAuctionWonEvent(event);
+    void handleWinnerDeterminedEvent_Success() {
+        WinnerDeterminedEvent event = new WinnerDeterminedEvent(auctionId, bidderId, new BigDecimal("500000"));
+        eventListener.handleWinnerDeterminedEvent(event);
 
         verify(walletClient).captureWinnerFunds(auctionId, bidderId);
 
@@ -127,7 +133,8 @@ class BiddingEventListenerTest {
 
     @Test
     void handleAuctionUnsoldEvent_Success() {
-        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId);
+        UUID sellerId = UUID.randomUUID();
+        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId, sellerId);
 
         eventListener.handleAuctionUnsoldEvent(event);
 
@@ -145,7 +152,8 @@ class BiddingEventListenerTest {
     @Test
     void handleBidPlacedEvent_ShouldLogAndContinue_WhenWalletReleaseFundsFails() {
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
+        UUID sellerId = UUID.randomUUID();
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
 
         // simulate error pas release funds
         doThrow(new RuntimeException("Wallet system down")).when(walletClient).releaseFunds(outbidHoldId);
@@ -159,7 +167,8 @@ class BiddingEventListenerTest {
     @Test
     void handleBidPlacedEvent_ShouldLogAndContinue_WhenNotificationFails() {
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
+        UUID sellerId = UUID.randomUUID();
+        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
 
         eventListener.handleBidPlacedEvent(event);
 
@@ -169,7 +178,8 @@ class BiddingEventListenerTest {
     @Test
     void handleAuctionUnsoldEvent_Success_FullCoverage() {
         // tangani lelang yang berakhir tanpa pemenang
-        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId);
+        UUID sellerId = UUID.randomUUID();
+        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId, sellerId);
 
         eventListener.handleAuctionUnsoldEvent(event);
 
@@ -191,13 +201,13 @@ class BiddingEventListenerTest {
         when(auctionRepository.findById(any())).thenReturn(Optional.of(auction));
         doThrow(new RuntimeException("Simulated WS Fail")).when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
 
-        eventListener.handleBidPlacedEvent(new BidPlacedEvent(auctionId, bidderId, BigDecimal.ONE, null, null));
+        eventListener.handleBidPlacedEvent(new BidPlacedEvent(auctionId, UUID.randomUUID(), bidderId, BigDecimal.ONE, null, null));
 
-        // trigger catch block di handleAuctionWonEvent
-        eventListener.handleAuctionWonEvent(new AuctionWonEvent(auctionId, bidderId, BigDecimal.TEN));
+        // trigger catch block di handleWinnerDeterminedEvent
+        eventListener.handleWinnerDeterminedEvent(new WinnerDeterminedEvent(auctionId, bidderId, BigDecimal.TEN));
 
         // trigger catch block di handleAuctionUnsoldEvent
-        eventListener.handleAuctionUnsoldEvent(new AuctionUnsoldEvent(auctionId));
+        eventListener.handleAuctionUnsoldEvent(new AuctionUnsoldEvent(auctionId, UUID.randomUUID()));
 
         verify(messagingTemplate, atLeast(3)).convertAndSend(anyString(), any(Map.class));
     }

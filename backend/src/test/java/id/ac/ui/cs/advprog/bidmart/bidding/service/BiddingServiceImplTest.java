@@ -3,9 +3,9 @@ package id.ac.ui.cs.advprog.bidmart.bidding.service;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.CatalogClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.dto.*;
-import id.ac.ui.cs.advprog.bidmart.bidding.event.AuctionUnsoldEvent;
-import id.ac.ui.cs.advprog.bidmart.bidding.event.AuctionWonEvent;
-import id.ac.ui.cs.advprog.bidmart.bidding.event.BidPlacedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.BidPlacedEvent;
+import id.ac.ui.cs.advprog.bidmart.common.event.WinnerDeterminedEvent;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Auction;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.AuctionStatus;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Bid;
@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -314,7 +315,7 @@ class BiddingServiceImplTest {
         assertTrue(auction.getReserveMet());
 
         verify(auctionRepository).save(auction);
-        verify(eventPublisher).publishEvent(any(AuctionWonEvent.class));
+        verify(eventPublisher).publishEvent(any(WinnerDeterminedEvent.class));
     }
 
     @Test
