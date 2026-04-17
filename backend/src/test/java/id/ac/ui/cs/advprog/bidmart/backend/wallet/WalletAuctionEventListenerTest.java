@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
+import java.math.BigDecimal;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -28,7 +29,7 @@ class WalletAuctionEventListenerTest {
     void onWinnerDetermined_ShouldCallCaptureWinnerHold() {
         UUID auctionId = UUID.randomUUID();
         UUID winnerId = UUID.randomUUID();
-        WinnerDeterminedEvent event = new WinnerDeterminedEvent(auctionId, winnerId, 9_500_000L);
+        WinnerDeterminedEvent event = new WinnerDeterminedEvent(auctionId, winnerId, BigDecimal.valueOf(9_500_000));
 
         listener.onWinnerDetermined(event);
 
@@ -39,7 +40,8 @@ class WalletAuctionEventListenerTest {
     @Test
     void onAuctionUnsold_ShouldCallReleaseAllHolds() {
         UUID auctionId = UUID.randomUUID();
-        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId);
+        UUID sellerId = UUID.randomUUID();
+        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId, sellerId);
 
         listener.onAuctionUnsold(event);
 

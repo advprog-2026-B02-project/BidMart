@@ -17,11 +17,11 @@ public class WalletAuctionEventListener {
 
     @EventListener
     public void onWinnerDetermined(WinnerDeterminedEvent event) {
-        walletService.captureWinnerHold(event.getAuctionId(), event.getWinnerId());
+        walletService.captureWinnerHold(event.auctionId(), event.winnerId());
     }
 
     @EventListener
     public void onAuctionUnsold(AuctionUnsoldEvent event) {
-        walletService.releaseAllHoldsForAuction(event.getAuctionId());
+        walletService.releaseAllHoldsForAuction(event.auctionId());
     }
 }
