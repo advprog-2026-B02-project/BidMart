@@ -384,6 +384,125 @@ class WalletControllerTest {
         verifyNoMoreInteractions(walletService);
     }
 
+    // --- resolveUserId branches ---
+
+    @Test
+    void unauthenticatedRequestShouldReturn404() throws Exception {
+        // principal == null branch in resolveUserId
+        mockMvc.perform(get("/api/wallets/me"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
+    void principalWithNullNameShouldReturn404() throws Exception {
+        // principal.getName() == null branch in resolveUserId
+        mockMvc.perform(get("/api/wallets/me").principal(() -> null))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    // --- createHold null userId branch ---
+
+    @Test
+    void createHoldWithNullRequestUserIdShouldUsePathUserId() throws Exception {
+        // request.getUserId() == null → sets from path
+        HoldRequest request = HoldRequest.builder()
+                .auctionId(UUID.randomUUID())
+                .amount(100_000L)
+                // userId intentionally omitted
+                .build();
+        HoldResponse response = HoldResponse.builder()
+                .holdId(UUID.randomUUID())
+                .userId(userId)
+                .amount(100_000L)
+                .status("ACTIVE")
+                .build();
+        when(walletService.createHold(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/wallets/" + userId + "/holds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.amount").value(100_000L));
+
+        verify(walletService).createHold(argThat(req -> userId.equals(req.getUserId())));
+        verifyNoMoreInteractions(walletService);
+    }
+
+    // --- WalletExceptionHandler handleConflict (IllegalStateException → 409) ---
+
+    @Test
+    void createHoldInsufficientBalanceShouldReturn409() throws Exception {
+        HoldRequest request = HoldRequest.builder()
+                .userId(userId)
+                .auctionId(UUID.randomUUID())
+                .amount(999_999_999L)
+                .build();
+        when(walletService.createHold(any()))
+                .thenThrow(new IllegalStateException("Saldo tidak mencukupi. Tersedia: 0, Dibutuhkan: 999999999"));
+
+        mockMvc.perform(post("/api/wallets/" + userId + "/holds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"))
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void topUpServiceErrorShouldReturn409() throws Exception {
+        when(walletService.topUp(any(), any()))
+                .thenThrow(new IllegalStateException("Service error"));
+
+        mockMvc.perform(post("/api/wallets/" + userId + "/top-up")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(TopUpRequest.builder().amount(10_000L).build())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+    }
+
+    @Test
+    void withdrawInsufficientBalanceShouldReturn409() throws Exception {
+        WithdrawRequest request = WithdrawRequest.builder()
+                .amount(500_000L)
+                .bankCode("BCA")
+                .accountNumber("1234567890")
+                .accountName("Test User")
+                .build();
+        when(walletService.withdraw(any(), any()))
+                .thenThrow(new IllegalStateException("Saldo tidak mencukupi."));
+
+        mockMvc.perform(post("/api/wallets/me/withdraw")
+                        .principal(() -> principalSubject)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+    }
+
+    @Test
+    void releaseHoldNotActiveShouldReturn409() throws Exception {
+        UUID holdId = UUID.randomUUID();
+        when(walletService.releaseHold(holdId))
+                .thenThrow(new IllegalStateException("Hold is not active: RELEASED"));
+
+        mockMvc.perform(post("/api/wallets/holds/" + holdId + "/release"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+    }
+
+    @Test
+    void captureHoldNotActiveShouldReturn409() throws Exception {
+        UUID holdId = UUID.randomUUID();
+        when(walletService.captureHold(holdId))
+                .thenThrow(new IllegalStateException("Hold is not active: CAPTURED"));
+
+        mockMvc.perform(post("/api/wallets/holds/" + holdId + "/capture"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+    }
+
     private UUID derivedUuid(String subject) {
         return UUID.nameUUIDFromBytes(("wallet-user-" + subject).getBytes(StandardCharsets.UTF_8));
     }

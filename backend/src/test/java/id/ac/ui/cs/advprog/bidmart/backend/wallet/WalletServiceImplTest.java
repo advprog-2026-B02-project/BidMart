@@ -295,7 +295,6 @@ class WalletServiceImplTest {
         assertThrows(IllegalStateException.class, () -> walletService.captureHold(holdId));
     }
 
-    // --- Withdraw ---
 
     @Test
     void withdraw_ShouldDeductBalanceAndReturnResponse() {
@@ -342,8 +341,6 @@ class WalletServiceImplTest {
 
         assertThrows(IllegalStateException.class, () -> walletService.withdraw(userId, request));
     }
-
-    // --- Transaction History ---
 
     @Test
     void getTransactionHistory_ShouldReturnPagedResults() {
@@ -420,7 +417,6 @@ class WalletServiceImplTest {
                 () -> walletService.getTransaction(userId, txnId));
     }
 
-    // --- Auction Event Handling ---
 
     @Test
     void captureWinnerHold_ShouldCaptureWinnerAndReleaseOthers() {
