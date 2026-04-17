@@ -2,19 +2,16 @@
 
 import {useState} from "react";
 import {useRouter} from "next/navigation";
-import AuthShell from "@/components/AuthShell"; // Sesuaikan path
-import {buttonCls, inputCls} from "@/components/ui"; // Sesuaikan path
+import AuthShell from "@/components/AuthShell";
+import {buttonCls, inputCls} from "@/components/ui";
 import {register} from "@/lib/api";
 
 export default function RegisterPage() {
     const router = useRouter();
 
-    // State form
-    const [displayName, setDisplayName] = useState(""); // State baru
+    const [displayName, setDisplayName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-
-    // State UI
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -25,12 +22,13 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            // Oper displayName ke fungsi API
             await register(email, password, displayName);
             setIsSuccess(true);
             setMsg("Registrasi berhasil! Silakan cek email Anda untuk verifikasi.");
-        } catch (err: any) {
-            setMsg(err.message);
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Gagal mendaftarkan akun.";
+            setMsg(message);
         } finally {
             setLoading(false);
         }

@@ -11,23 +11,28 @@ function VerifyContent() {
     const router = useRouter();
     const token = searchParams.get("token");
 
-    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-    const [msg, setMsg] = useState("");
+    const initialStatus: "loading" | "success" | "error" = token ? "loading" : "error";
+    const initialMessage = token ? "" : "Token verifikasi tidak ditemukan.";
+
+    const [status, setStatus] = useState<"loading" | "success" | "error">(initialStatus);
+    const [msg, setMsg] = useState(initialMessage);
 
     useEffect(() => {
         if (!token) {
-            setStatus("error");
-            setMsg("Token verifikasi tidak ditemukan.");
             return;
         }
 
+        const safeToken = token;
+
         async function doVerify() {
             try {
-                await verifyEmail(token!);
+                await verifyEmail(safeToken);
                 setStatus("success");
-            } catch (err: any) {
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : "Verifikasi gagal.";
                 setStatus("error");
-                setMsg(err.message);
+                setMsg(message);
             }
         }
 

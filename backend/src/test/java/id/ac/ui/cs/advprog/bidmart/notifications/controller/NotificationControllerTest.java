@@ -1,0 +1,67 @@
+package id.ac.ui.cs.advprog.bidmart.notifications.controller;
+
+import id.ac.ui.cs.advprog.bidmart.notifications.dto.NotificationListResponse;
+import id.ac.ui.cs.advprog.bidmart.notifications.service.NotificationService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+
+import java.util.Map;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
+
+@ExtendWith(MockitoExtension.class)
+class NotificationControllerTest {
+
+    @Mock
+    private NotificationService notificationService;
+
+    @InjectMocks
+    private NotificationController controller;
+
+    @Test
+    void getNotifications() {
+        UUID userId = UUID.randomUUID();
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(Map.of("userId", userId.toString()));
+        when(notificationService.getNotifications(userId, false, 0, 20))
+            .thenReturn(NotificationListResponse.builder().build());
+        
+        ResponseEntity<NotificationListResponse> res = controller.getNotifications(authentication, false, 0, 20);
+        assertEquals(200, res.getStatusCode().value());
+    }
+
+    @Test
+    void markAsRead() {
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(Map.of("userId", userId.toString()));
+        doNothing().when(notificationService).markAsRead(id, userId);
+
+        ResponseEntity<Void> res = controller.markAsRead(authentication, id);
+        assertEquals(200, res.getStatusCode().value());
+        verify(notificationService).markAsRead(id, userId);
+    }
+
+    @Test
+    void markAllAsRead() {
+        UUID userId = UUID.randomUUID();
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(Map.of("userId", userId.toString()));
+        doNothing().when(notificationService).markAllAsRead(userId);
+
+        ResponseEntity<Void> res = controller.markAllAsRead(authentication);
+        assertEquals(200, res.getStatusCode().value());
+        verify(notificationService).markAllAsRead(userId);
+    }
+}

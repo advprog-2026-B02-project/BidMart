@@ -10,33 +10,49 @@ function ResetContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const token = searchParams.get("token");
+    const hasToken = Boolean(token);
+    const missingTokenMessage = "Token tidak valid atau tidak ditemukan di URL.";
 
     const [pass, setPass] = useState("");
     const [pass2, setPass2] = useState("");
     const [loading, setLoading] = useState(false);
-    const [msg, setMsg] = useState<string | null>(null);
+    const [msg, setMsg] = useState<string | null>(hasToken ? null : missingTokenMessage);
     const [isSuccess, setIsSuccess] = useState(false);
 
-    const [tokenStatus, setTokenStatus] = useState<"checking" | "valid" | "invalid">("checking");
+    const [tokenStatus, setTokenStatus] = useState<"checking" | "valid" | "invalid">(
+        hasToken ? "checking" : "invalid",
+    );
 
     useEffect(() => {
         if (!token) {
-            setMsg("Token tidak valid atau tidak ditemukan di URL.");
-            setTokenStatus("invalid");
             return;
         }
 
+        let isActive = true;
+
         async function checkToken() {
             try {
-                await validateResetToken(token!);
+                await validateResetToken(token);
+                if (!isActive) {
+                    return;
+                }
                 setTokenStatus("valid");
-            } catch (err: any) {
-                setMsg(err.message);
+            } catch (err: unknown) {
+                if (!isActive) {
+                    return;
+                }
+                const message =
+                    err instanceof Error ? err.message : "Token reset tidak valid.";
+                setMsg(message);
                 setTokenStatus("invalid");
             }
         }
 
         checkToken();
+
+        return () => {
+            isActive = false;
+        };
     }, [token]);
 
     async function onSubmit(e: React.FormEvent) {
@@ -48,9 +64,15 @@ function ResetContent() {
             return;
         }
 
+        if (!token) {
+            setMsg(missingTokenMessage);
+            setTokenStatus("invalid");
+            return;
+        }
+
         setLoading(true);
         try {
-            await resetPassword(token!, pass);
+            await resetPassword(token, pass);
             setIsSuccess(true);
             setMsg("Kata sandi berhasil diperbarui! Mengalihkan ke halaman login...");
 
@@ -58,10 +80,13 @@ function ResetContent() {
                 router.push("/login");
             }, 2000);
 
-        } catch (err: any) {
-            setMsg(err.message);
-            setLoading(false);
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Gagal memperbarui kata sandi.";
+            setMsg(message);
             setTokenStatus("invalid");
+        } finally {
+            setLoading(false);
         }
     }
 

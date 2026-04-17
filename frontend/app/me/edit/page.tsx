@@ -24,8 +24,10 @@ export default function EditProfilePage() {
                 const data = await me();
                 setDisplayName(data?.displayName || "");
                 setAvatarUrl(data?.avatarUrl || "");
-            } catch (err: any) {
-                setMsg(err?.message || "Gagal memuat profil.");
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : "Gagal memuat profil.";
+                setMsg(message);
             } finally {
                 setInitLoading(false);
             }
@@ -46,8 +48,10 @@ export default function EditProfilePage() {
             setTimeout(() => {
                 router.push("/me");
             }, 2000);
-        } catch (err: any) {
-            setMsg(err.message);
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Gagal memperbarui profil.";
+            setMsg(message);
         } finally {
             setLoading(false);
         }

@@ -26,8 +26,10 @@ export default function MePage() {
                     avatarUrl: data?.avatarUrl || null,
                 });
                 setMsg("");
-            } catch (err: any) {
-                setMsg(err?.message || "Belum login / sesi habis.");
+            } catch (err: unknown) {
+                const message =
+                    err instanceof Error ? err.message : "Belum login / sesi habis.";
+                setMsg(message);
             }
         })();
     }, []);
@@ -36,8 +38,8 @@ export default function MePage() {
         try {
             await logout();
             router.push("/login");
-        } catch (err) {
-            // do nothing
+        } catch {
+            // noop
         }
     }
 
@@ -51,17 +53,14 @@ export default function MePage() {
             subtitle="Informasi akun yang sedang aktif saat ini."
         >
             <div className="flex flex-col space-y-6">
-
                 {msg ? (
                     <div className="text-center text-sm font-medium text-black/50 py-4">
                         {msg}
                     </div>
                 ) : (
-                    <div
-                        className="p-6 rounded-2xl bg-[#002447]/5 border border-[#002447]/10 flex items-center space-x-5">
+                    <div className="p-6 rounded-2xl bg-[#002447]/5 border border-[#002447]/10 flex items-center space-x-5">
                         {/* FOTO PROFIL / AVATAR */}
-                        <div
-                            className="flex-shrink-0 w-16 h-16 rounded-full overflow-hidden bg-[#002447] text-white flex items-center justify-center text-2xl font-bold shadow-inner">
+                        <div className="flex-shrink-0 w-16 h-16 rounded-full overflow-hidden bg-[#002447] text-white flex items-center justify-center text-2xl font-bold shadow-inner">
                             {user?.avatarUrl ? (
                                 <img
                                     src={user.avatarUrl}
@@ -88,13 +87,29 @@ export default function MePage() {
                     </div>
                 )}
 
-                <div className="pt-4">
+                <div className="pt-4 space-y-3">
+                    <button
+                        onClick={() => router.push("/wallet")}
+                        className="w-full rounded-xl py-4 text-lg font-bold text-white bg-gradient-to-r from-bidnavy to-bidnavy2 hover:opacity-90 transition-all shadow-md active:scale-[0.98]"
+                        disabled={!!msg}
+                    >
+                        Wallet Demo
+                    </button>
+
                     <button
                         onClick={() => router.push("/me/edit")}
-                        className="w-full mb-3 rounded-xl py-4 text-lg font-bold text-[#002447] bg-[#002447]/10 hover:bg-[#002447]/20 transition-all shadow-sm active:scale-[0.98]"
+                        className="w-full rounded-xl py-4 text-lg font-bold text-[#002447] bg-[#002447]/10 hover:bg-[#002447]/20 transition-all shadow-sm active:scale-[0.98]"
                         disabled={!!msg}
                     >
                         Edit Profil
+                    </button>
+
+                    <button
+                        onClick={() => router.push("/me/2fa")}
+                        className="w-full rounded-xl py-4 text-lg font-bold text-[#002447] bg-[#002447]/10 hover:bg-[#002447]/20 transition-all shadow-sm active:scale-[0.98]"
+                        disabled={!!msg}
+                    >
+                        Kelola 2FA
                     </button>
 
                     <button

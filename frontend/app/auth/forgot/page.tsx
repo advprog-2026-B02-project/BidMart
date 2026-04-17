@@ -22,8 +22,10 @@ export default function ForgotPage() {
             await forgotPassword(email);
             setIsSuccess(true);
             setMsg("Instruksi reset kata sandi telah dikirim ke email Anda. Silakan cek kotak masuk atau folder spam.");
-        } catch (err: any) {
-            setMsg(err.message);
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Gagal mengirim link reset kata sandi.";
+            setMsg(message);
         } finally {
             setLoading(false);
         }
