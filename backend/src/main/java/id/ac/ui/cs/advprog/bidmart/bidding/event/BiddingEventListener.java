@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.event;
 
-import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.repository.AuctionRepository;
 import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
 import id.ac.ui.cs.advprog.bidmart.common.event.BidPlacedEvent;
@@ -20,7 +19,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BiddingEventListener {
 
-    private final WalletClient walletClient;
     private final SimpMessagingTemplate messagingTemplate;
     private final AuctionRepository auctionRepository;
 
@@ -29,16 +27,7 @@ public class BiddingEventListener {
     @Async
     @EventListener
     public void handleBidPlacedEvent(BidPlacedEvent event) {
-        log.info("memproses event bid untuk lelang: {}", event.auctionId());
-
-        // proses outbid (lepas dana dan kirim notifikasi)
-        if (event.outbidUserId() != null && event.outbidHoldId() != null) {
-            try {
-                walletClient.releaseFunds(event.outbidHoldId());
-            } catch (Exception e) {
-                log.error("gagal melepas dana/notifikasi untuk hold id: {}", event.outbidHoldId(), e);
-            }
-        }
+        log.info("memproses event bid untuk websocket lelang: {}", event.auctionId());
 
         // broadcast realtime update ke semua user yang sedang melihat lelang ini
         try {
@@ -82,10 +71,8 @@ public class BiddingEventListener {
     @Async
     @EventListener
     public void handleWinnerDeterminedEvent(WinnerDeterminedEvent event) {
+        // broadcast lelang selesai
         try {
-            walletClient.captureWinnerFunds(event.auctionId(), event.winnerId());
-
-            // broadcast lelang selesai
             Map<String, Object> payload = new HashMap<>();
             Map<String, Object> data = new HashMap<>();
 
@@ -99,17 +86,15 @@ public class BiddingEventListener {
 
             messagingTemplate.convertAndSend(AUCTION_TOPIC_PREFIX + event.auctionId(), payload);
         } catch (Exception e) {
-            log.error("gagal memproses kemenangan lelang: {}", event.auctionId(), e);
+            log.error("gagal memproses websocket kemenangan lelang: {}", event.auctionId(), e);
         }
     }
 
     @Async
     @EventListener
     public void handleAuctionUnsoldEvent(AuctionUnsoldEvent event) {
+        // broadcast lelang gagal terjual
         try {
-            walletClient.releaseAllAuctionHolds(event.auctionId());
-
-            // broadcast lelang gagal terjual
             Map<String, Object> payload = new HashMap<>();
             Map<String, Object> data = new HashMap<>();
             data.put("status", "UNSOLD");
@@ -119,7 +104,7 @@ public class BiddingEventListener {
 
             messagingTemplate.convertAndSend(AUCTION_TOPIC_PREFIX + event.auctionId(), payload);
         } catch (Exception e) {
-            log.error("gagal memproses kegagalan lelang: {}", event.auctionId(), e);
+            log.error("gagal memproses websocket kegagalan lelang: {}", event.auctionId(), e);
         }
     }
 }
