@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.event;
 
-import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.model.Auction;
 import id.ac.ui.cs.advprog.bidmart.bidding.repository.AuctionRepository;
 import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
@@ -32,8 +31,6 @@ import static org.mockito.Mockito.*;
 class BiddingEventListenerTest {
 
     @Mock
-    private WalletClient walletClient;
-    @Mock
     private SimpMessagingTemplate messagingTemplate;
     @Mock
     private AuctionRepository auctionRepository;
@@ -41,7 +38,6 @@ class BiddingEventListenerTest {
     @InjectMocks
     private BiddingEventListener eventListener;
 
-    // pakai @Captor biar tipe Generics-nya kebaca jelas sama compiler
     @Captor
     private ArgumentCaptor<Map<String, Object>> payloadCaptor;
 
@@ -68,7 +64,7 @@ class BiddingEventListenerTest {
     }
 
     @Test
-    void handleBidPlacedEvent_Success_WithOutbidAndExtension() {
+    void handleBidPlacedEvent_Success_WithExtension() {
         auction.setExtensionCount(1);
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
 
@@ -77,8 +73,7 @@ class BiddingEventListenerTest {
 
         eventListener.handleBidPlacedEvent(event);
 
-        verify(walletClient).releaseFunds(outbidHoldId);
-
+        // hanya verifikasi pengiriman WebSocket (2 kali karena ada extension)
         verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
 
         Map<String, Object> firstPayload = payloadCaptor.getAllValues().get(0);
@@ -89,7 +84,7 @@ class BiddingEventListenerTest {
     }
 
     @Test
-    void handleBidPlacedEvent_Success_NoOutbidNoExtension() {
+    void handleBidPlacedEvent_Success_NoExtension() {
         when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
 
         UUID sellerId = UUID.randomUUID();
@@ -97,21 +92,7 @@ class BiddingEventListenerTest {
 
         eventListener.handleBidPlacedEvent(event);
 
-        verify(walletClient, never()).releaseFunds(any());
-
-        verify(messagingTemplate, times(1)).convertAndSend(anyString(), any(Map.class));
-    }
-
-    @Test
-    void handleBidPlacedEvent_CatchException_WhenWalletFails() {
-        UUID sellerId = UUID.randomUUID();
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-
-        doThrow(new RuntimeException("Wallet Error")).when(walletClient).releaseFunds(any());
-
-        eventListener.handleBidPlacedEvent(event);
-
+        // hanya verifikasi pengiriman WebSocket 1 kali
         verify(messagingTemplate, times(1)).convertAndSend(anyString(), any(Map.class));
     }
 
@@ -119,8 +100,6 @@ class BiddingEventListenerTest {
     void handleWinnerDeterminedEvent_Success() {
         WinnerDeterminedEvent event = new WinnerDeterminedEvent(auctionId, bidderId, new BigDecimal("500000"));
         eventListener.handleWinnerDeterminedEvent(event);
-
-        verify(walletClient).captureWinnerFunds(auctionId, bidderId);
 
         verify(messagingTemplate).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
 
@@ -138,77 +117,27 @@ class BiddingEventListenerTest {
 
         eventListener.handleAuctionUnsoldEvent(event);
 
-        verify(walletClient).releaseAllAuctionHolds(auctionId);
-
         verify(messagingTemplate).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
 
         assertEquals("AUCTION_ENDED", payloadCaptor.getValue().get("type"));
 
-        // pakai Map<?, ?>
         Map<?, ?> data = (Map<?, ?>) payloadCaptor.getValue().get("data");
         assertEquals("UNSOLD", data.get("status"));
     }
 
     @Test
-    void handleBidPlacedEvent_ShouldLogAndContinue_WhenWalletReleaseFundsFails() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-        UUID sellerId = UUID.randomUUID();
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
-
-        // simulate error pas release funds
-        doThrow(new RuntimeException("Wallet system down")).when(walletClient).releaseFunds(outbidHoldId);
-
-        eventListener.handleBidPlacedEvent(event);
-
-        // verify websocket tetep dikirim meskipun wallet error
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/auctions/" + auctionId), any(Map.class));
-    }
-
-    @Test
-    void handleBidPlacedEvent_ShouldLogAndContinue_WhenNotificationFails() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-        UUID sellerId = UUID.randomUUID();
-        BidPlacedEvent event = new BidPlacedEvent(auctionId, sellerId, bidderId, new BigDecimal("150000"), outbidUserId, outbidHoldId);
-
-        eventListener.handleBidPlacedEvent(event);
-
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(anyString(), any(Map.class));
-    }
-
-    @Test
-    void handleAuctionUnsoldEvent_Success_FullCoverage() {
-        // tangani lelang yang berakhir tanpa pemenang
-        UUID sellerId = UUID.randomUUID();
-        AuctionUnsoldEvent event = new AuctionUnsoldEvent(auctionId, sellerId);
-
-        eventListener.handleAuctionUnsoldEvent(event);
-
-        // pastiin wallet melepas semua hold dana untuk auction tersebut
-        verify(walletClient).releaseAllAuctionHolds(auctionId);
-
-        // pastiin websocket ngirim info UNSOLD
-        verify(messagingTemplate).convertAndSend(eq("/topic/auctions/" + auctionId), payloadCaptor.capture());
-        Map<String, Object> payload = payloadCaptor.getValue();
-        assertEquals("AUCTION_ENDED", payload.get("type"));
-
-        Map<?, ?> data = (Map<?, ?>) payload.get("data");
-        assertEquals("UNSOLD", data.get("status"));
-    }
-
-    @Test
     void handleEvents_ShouldLog_WhenWebsocketFails() {
-        // trigger catch block di handleBidPlacedEvent
         when(auctionRepository.findById(any())).thenReturn(Optional.of(auction));
+
+        // simulate error saat ngirim pesan WebSocket
         doThrow(new RuntimeException("Simulated WS Fail")).when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
 
+        // execute ketiga event
         eventListener.handleBidPlacedEvent(new BidPlacedEvent(auctionId, UUID.randomUUID(), bidderId, BigDecimal.ONE, null, null));
-
-        // trigger catch block di handleWinnerDeterminedEvent
         eventListener.handleWinnerDeterminedEvent(new WinnerDeterminedEvent(auctionId, bidderId, BigDecimal.TEN));
-
-        // trigger catch block di handleAuctionUnsoldEvent
         eventListener.handleAuctionUnsoldEvent(new AuctionUnsoldEvent(auctionId, UUID.randomUUID()));
 
+        // pastiin methode convertAndSend tetap dipanggil 3 kali meski error (karena ada try-catch di tiap handler)
         verify(messagingTemplate, atLeast(3)).convertAndSend(anyString(), any(Map.class));
     }
 }
