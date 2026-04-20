@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -308,5 +309,33 @@ class AuthServiceTest {
         t.setExpiresAt(Instant.now().minusSeconds(100));
         when(resetTokens.findByToken("token")).thenReturn(Optional.of(t));
         assertThrows(IllegalArgumentException.class, () -> authService.validateResetToken("token"));
+    }
+
+    @Test
+    void legacyConstructor_AdminRoleRepositoryUnavailable() {
+        assertEquals(List.of(), authService.adminListRoles());
+
+        id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RoleRequestDTO req =
+                new id.ac.ui.cs.advprog.bidmart.backend.auth.dto.RoleRequestDTO();
+        req.name = "admin";
+        req.permissions = List.of("users:write");
+
+        IllegalStateException createEx = assertThrows(IllegalStateException.class,
+                () -> authService.adminCreateRole(req));
+        assertEquals("Role repository unavailable", createEx.getMessage());
+
+        IllegalStateException updateEx = assertThrows(IllegalStateException.class,
+                () -> authService.adminUpdateRole(UUID.randomUUID(), req));
+        assertEquals("Role repository unavailable", updateEx.getMessage());
+    }
+
+    @Test
+    void legacyConstructor_NoOpEventPublisherMethodsReachable() {
+        Object publisher = org.springframework.test.util.ReflectionTestUtils.getField(authService, "eventPublisher");
+        assertNotNull(publisher);
+
+        ((org.springframework.context.ApplicationEventPublisher) publisher).publishEvent("event");
+        ((org.springframework.context.ApplicationEventPublisher) publisher)
+                .publishEvent(new org.springframework.context.ApplicationEvent("source") {});
     }
 }

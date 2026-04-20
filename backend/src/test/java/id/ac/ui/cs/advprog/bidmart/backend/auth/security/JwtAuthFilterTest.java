@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmart.backend.auth.security;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -55,7 +56,16 @@ class JwtAuthFilterTest {
         when(request.getRequestURI()).thenReturn("/auth/refresh");
         assertTrue(filter.shouldNotFilter(request));
 
+        when(request.getRequestURI()).thenReturn("/auth/2fa/verify");
+        assertTrue(filter.shouldNotFilter(request));
+
+        when(request.getRequestURI()).thenReturn("/auth/verify-email");
+        assertTrue(filter.shouldNotFilter(request));
+
         when(request.getRequestURI()).thenReturn("/health");
+        assertTrue(filter.shouldNotFilter(request));
+
+        when(request.getRequestURI()).thenReturn("/ws/socket");
         assertTrue(filter.shouldNotFilter(request));
 
         when(request.getRequestURI()).thenReturn("/api/orders");
@@ -104,5 +114,41 @@ class JwtAuthFilterTest {
 
         verify(filterChain).doFilter(request, response);
         assertTrue(SecurityContextHolder.getContext().getAuthentication() != null);
+    }
+
+    @Test
+    void doFilterInternal_ValidJwtWithRoles() throws Exception {
+        AuthProperties props = new AuthProperties();
+        props.setSecret("my-super-secret-key-that-is-at-least-32-bytes");
+        props.setAccessTokenExpiration(3600000L);
+        JwtService svc = new JwtService(props);
+        UUID userId = UUID.randomUUID();
+        String token = svc.generateAccessToken(userId, "email@email.com", UUID.randomUUID(), java.util.List.of("ADMIN", ""));
+
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())));
+    }
+
+    @Test
+    void doFilterInternal_ValidJwtWithNullRoleEntry() throws Exception {
+        AuthProperties props = new AuthProperties();
+        props.setSecret("my-super-secret-key-that-is-at-least-32-bytes");
+        props.setAccessTokenExpiration(3600000L);
+        JwtService svc = new JwtService(props);
+        UUID userId = UUID.randomUUID();
+        String token = svc.generateAccessToken(userId, "email@email.com", UUID.randomUUID(), Arrays.asList("ADMIN", null));
+
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())));
     }
 }
