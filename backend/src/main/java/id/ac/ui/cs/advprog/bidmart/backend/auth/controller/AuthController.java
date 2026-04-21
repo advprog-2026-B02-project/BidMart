@@ -124,4 +124,9 @@ public class AuthController {
         return ResponseEntity.ok(auth.login(req.email, req.password));
     }
 
+    @GetMapping("/{userId}/validate")
+    public ResponseEntity<Void> validateUser(@PathVariable("userId") java.util.UUID userId) {
+        auth.validateUser(userId);
+        return ResponseEntity.ok().build();
+    }
 }

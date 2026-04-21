@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.service;
 
 import id.ac.ui.cs.advprog.bidmart.bidding.client.CatalogClient;
+import id.ac.ui.cs.advprog.bidmart.bidding.client.UserClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
 import id.ac.ui.cs.advprog.bidmart.common.event.BidPlacedEvent;
@@ -33,6 +34,7 @@ public class BiddingServiceImpl implements BiddingService {
     private final WalletClient walletClient;
     private final ApplicationEventPublisher eventPublisher;
     private final CatalogClient catalogClient;
+    private final UserClient userClient;
 
     private static final String AUCTION_NOT_FOUND_MSG = "lelang tidak ditemukan";
 
@@ -43,6 +45,15 @@ public class BiddingServiceImpl implements BiddingService {
         // fetch data dengan pessimistic lock untuk mencegah race condition
         Auction auction = auctionRepository.findByIdWithPessimisticLock(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException(AUCTION_NOT_FOUND_MSG));
+
+        // pastikan user asli
+        userClient.validateUser(bidderId);
+
+        // penjual dilarang ngebid barangnya sendiri
+        UUID sellerId = catalogClient.getSellerId(auction.getListingId());
+        if (bidderId.equals(sellerId)) {
+            throw new IllegalStateException("penjual tidak boleh menawar barangnya sendiri");
+        }
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -70,9 +81,9 @@ public class BiddingServiceImpl implements BiddingService {
 
             // Logika if-else utama dipisah ke helper method
             if (incomingMaxAmount.compareTo(currentMaxAmount) > 0) {
-                newBid = processWinningBid(auction, bidderId, incomingMaxAmount, currentMaxAmount, holdId, now);
+                newBid = processWinningBid(auction, bidderId, incomingMaxAmount, currentMaxAmount, holdId, now, sellerId);
             } else {
-                newBid = processLosingProxyBid(auction, bidderId, incomingMaxAmount, currentMaxAmount, holdId, now);
+                newBid = processLosingProxyBid(auction, bidderId, incomingMaxAmount, currentMaxAmount, holdId, now, sellerId);
             }
 
             auctionRepository.save(auction);
@@ -84,8 +95,7 @@ public class BiddingServiceImpl implements BiddingService {
         }
     }
 
-    // skenario penawar baru menang
-    private Bid processWinningBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now) {
+    private Bid processWinningBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now, UUID sellerId) {
         BigDecimal increment = auction.getMinimumIncrement();
         BigDecimal newCurrentPrice;
 
@@ -125,10 +135,6 @@ public class BiddingServiceImpl implements BiddingService {
         newBid.setCreatedAt(now);
         newBid = bidRepository.save(newBid);
 
-        // get seller id for event
-        UUID sellerId = catalogClient.getSellerId(auction.getListingId());
-
-        // broadcast event outbid untuk penawar lama kalau ada
         if (previousBidderId != null) {
             eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), sellerId, bidderId, newCurrentPrice, previousBidderId, outbidHoldId));
         } else {
@@ -138,8 +144,7 @@ public class BiddingServiceImpl implements BiddingService {
         return newBid;
     }
 
-    // skenario penawar lama bertahan (auto-bid)
-    private Bid processLosingProxyBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now) {
+    private Bid processLosingProxyBid(Auction auction, UUID bidderId, BigDecimal incomingMaxAmount, BigDecimal currentMaxAmount, UUID holdId, LocalDateTime now, UUID sellerId) {
         BigDecimal increment = auction.getMinimumIncrement();
         BigDecimal newCurrentPrice = incomingMaxAmount.add(increment);
 
@@ -168,9 +173,6 @@ public class BiddingServiceImpl implements BiddingService {
         walletClient.releaseFunds(holdId);
 
         // penawar lama ga perlu ditahan dananya lagi karena dari awal udah ditahan full max
-
-        // get seller id for event
-        UUID sellerId = catalogClient.getSellerId(auction.getListingId());
 
         // broadcast update harga baru ke websocket (tanpa outbid id karena pemenangnya tetep sama)
         eventPublisher.publishEvent(new BidPlacedEvent(auction.getId(), sellerId, auction.getHighestBidderId(), newCurrentPrice, null, null));

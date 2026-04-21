@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.bidmart.bidding.service;
 
 import id.ac.ui.cs.advprog.bidmart.bidding.client.CatalogClient;
+import id.ac.ui.cs.advprog.bidmart.bidding.client.UserClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.client.WalletClient;
 import id.ac.ui.cs.advprog.bidmart.bidding.dto.*;
 import id.ac.ui.cs.advprog.bidmart.common.event.AuctionUnsoldEvent;
@@ -48,6 +49,8 @@ class BiddingServiceImplTest {
     private ApplicationEventPublisher eventPublisher;
     @Mock
     private CatalogClient catalogClient;
+    @Mock
+    private UserClient userClient;
 
     @InjectMocks
     private BiddingServiceImpl biddingService;
@@ -57,6 +60,7 @@ class BiddingServiceImplTest {
     private UUID bidderId;
     private UUID oldBidderId;
     private UUID holdId;
+    private UUID sellerId;
 
     @BeforeEach
     void setUp() {
@@ -64,6 +68,7 @@ class BiddingServiceImplTest {
         bidderId = UUID.randomUUID();
         oldBidderId = UUID.randomUUID();
         holdId = UUID.randomUUID();
+        sellerId = UUID.randomUUID();
 
         auction = new Auction();
         auction.setId(auctionId);
@@ -87,6 +92,10 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("150000"));
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        // mock User & seller Check
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(bidderId, auctionId, request.getAmount())).thenReturn(holdId);
 
         Bid savedBid = new Bid();
@@ -118,6 +127,10 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("200000")); // new bidder max 200rb
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        // mock User & seller Check
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(bidderId, auctionId, request.getAmount())).thenReturn(holdId);
 
         Bid savedBid = new Bid();
@@ -154,6 +167,10 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("200000")); // iseng nawar 200rb
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        // mock User & seller Check
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(bidderId, auctionId, request.getAmount())).thenReturn(holdId);
 
         Bid savedBid = new Bid();
@@ -189,6 +206,10 @@ class BiddingServiceImplTest {
         auction.setEndTime(LocalDateTime.now().minusMinutes(5)); // udah abis
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
 
+        // tetep mock karena logic security dieksekusi sebelum logic waktu
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
+
         assertThrows(IllegalStateException.class, () ->
                 biddingService.placeBid(auctionId, bidderId, new BidRequestDTO())
         );
@@ -201,6 +222,9 @@ class BiddingServiceImplTest {
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
 
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
+
         assertThrows(IllegalArgumentException.class, () ->
                 biddingService.placeBid(auctionId, bidderId, request)
         );
@@ -212,6 +236,8 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("150000"));
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(bidderId, auctionId, request.getAmount())).thenReturn(holdId);
 
         // simulasi db mati pas nyimpen
@@ -234,6 +260,8 @@ class BiddingServiceImplTest {
         auction.setEndTime(LocalDateTime.now().plusMinutes(1));
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(bidderId, auctionId, request.getAmount())).thenReturn(holdId);
 
         Bid savedBid = new Bid();
@@ -352,6 +380,8 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("155000"));
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
         when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
 
@@ -374,6 +404,8 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("250000"));
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
         when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
 
@@ -400,6 +432,8 @@ class BiddingServiceImplTest {
         request.setAmount(new BigDecimal("160000")); // 160k > 150k (reserve), tapi < 500k (kalah)
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
         when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
         when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
 
@@ -424,6 +458,9 @@ class BiddingServiceImplTest {
 
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
 
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
+
         // harus di-mock biar holdId ga null pas mau di-release
         when(walletClient.holdFunds(any(), any(), any())).thenReturn(holdId);
         when(bidRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
@@ -439,6 +476,9 @@ class BiddingServiceImplTest {
     void validateAuctionIsActive_ThrowsWhenNotActive() {
         auction.setStatus(AuctionStatus.WON);
         when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        doNothing().when(userClient).validateUser(bidderId);
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(sellerId);
 
         assertThrows(IllegalStateException.class, () ->
                 biddingService.placeBid(auctionId, bidderId, new BidRequestDTO())
@@ -457,5 +497,45 @@ class BiddingServiceImplTest {
 
         assertNotNull(result);
         assertEquals(auctionId, result.getAuctionId());
+    }
+
+    @Test
+    void placeBid_Fail_UserNotFound() {
+        BidRequestDTO request = new BidRequestDTO();
+        request.setAmount(new BigDecimal("150000"));
+
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+
+        // simulasi throw error dari module user
+        doThrow(new IllegalArgumentException("Unknown user!"))
+                .when(userClient).validateUser(bidderId);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                biddingService.placeBid(auctionId, bidderId, request)
+        );
+
+        // pastikan belum nyentuh dompet sama sekali
+        verifyNoInteractions(walletClient);
+    }
+
+    @Test
+    void placeBid_Fail_SellerBiddingOwnItem() {
+        BidRequestDTO request = new BidRequestDTO();
+        request.setAmount(new BigDecimal("150000"));
+
+        when(auctionRepository.findByIdWithPessimisticLock(auctionId)).thenReturn(Optional.of(auction));
+        doNothing().when(userClient).validateUser(bidderId);
+
+        // simulate id penjual sama dengan id pembeli
+        when(catalogClient.getSellerId(auction.getListingId())).thenReturn(bidderId);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                biddingService.placeBid(auctionId, bidderId, request)
+        );
+
+        assertEquals("penjual tidak boleh menawar barangnya sendiri", exception.getMessage());
+
+        // pastiin belum nyentuh dompet sama sekali
+        verifyNoInteractions(walletClient);
     }
 }
