@@ -632,4 +632,16 @@ public class AuthService {
         }
         return new RoleResponseDTO(role.getId(), role.getName(), permissions);
     }
+
+    @Transactional(readOnly = true)
+    public void validateUser(UUID userId) {
+        if (!users.existsById(userId)) {
+            throw new IllegalArgumentException("ID tidak terdaftar di sistem.");
+        }
+
+        User u = users.findById(userId).get();
+        if (u.getStatus() == UserStatus.SUSPENDED) {
+            throw new IllegalStateException("User ini telah di-suspend.");
+        }
+    }
 }
